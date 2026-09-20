@@ -1,0 +1,167 @@
+name: Worker container
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/worker-container.yml"
+      - "worker/**"
+  pull_request:
+    paths:
+      - ".github/workflows/worker-container.yml"
+      - "worker/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build and validate simulation worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build worker image
+        run: docker build --tag voxcpm-worker:ci worker
+
+      - name: Start worker and validate contract
+        shell: bash
+        env:
+          WORKER_API_KEY: worker-ci-key-with-at-least-32-characters
+        run: |
+          set -euo pipefail
+
+          cleanup() {
+            docker rm --force voxcpm-worker-ci >/dev/null 2>&1 || true
+            docker volume rm voxcpm-worker-ci-data >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          start_worker() {
+            docker run --detach \
+              --name voxcpm-worker-ci \
+              --publish 127.0.0.1:8001:8001 \
+              --env WORKER_API_KEY \
+              --env WORKER_SIMULATION_DELAY_MS=20 \
+              --mount source=voxcpm-worker-ci-data,target=/workspace \
+              voxcpm-worker:ci
+
+            for attempt in {1..30}; do
+              if curl --fail --silent http://127.0.0.1:8001/health > /tmp/health.json; then
+                return 0
+              fi
+              sleep 1
+            done
+
+            docker logs voxcpm-worker-ci
+            return 1
+          }
+
+          wait_for_container_health() {
+            for attempt in {1..45}; do
+              container_health="$(docker inspect --format '{{.State.Health.Status}}' voxcpm-worker-ci)"
+              if [ "${container_health}" = "healthy" ]; then
+                return 0
+              fi
+              if [ "${container_health}" = "unhealthy" ]; then
+                docker inspect voxcpm-worker-ci
+                docker logs voxcpm-worker-ci
+                return 1
+              fi
+              sleep 1
+            done
+
+            docker inspect voxcpm-worker-ci
+            docker logs voxcpm-worker-ci
+            return 1
+          }
+
+          start_worker
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/health.json", encoding="utf-8") as handle:
+              health = json.load(handle)
+          assert health == {
+              "status": "ok",
+              "service": "voxcpm-worker",
+              "mode": "simulation",
+          }
+          PY
+
+          test "$(docker exec voxcpm-worker-ci id -u)" = "10001"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8001/v1/ready)" = "401"
+
+          curl --fail --silent \
+            --header "X-Worker-Key: ${WORKER_API_KEY}" \
+            http://127.0.0.1:8001/v1/ready \
+            > /tmp/ready.json
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/ready.json", encoding="utf-8") as handle:
+              ready = json.load(handle)
+          assert ready["ready"] is True
+          assert ready["mode"] == "simulation"
+          assert "not loaded" in ready["message"]
+          PY
+
+          status_code="$(curl --silent \
+            --output /tmp/job.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --header "X-Worker-Key: ${WORKER_API_KEY}" \
+            --data '{"job_id":"job-ci-0001","text":"Uji container worker simulasi.","mode":"tts","style":"natural"}' \
+            http://127.0.0.1:8001/v1/jobs)"
+          test "${status_code}" = "202"
+
+          for attempt in {1..30}; do
+            curl --fail --silent \
+              --header "X-Worker-Key: ${WORKER_API_KEY}" \
+              http://127.0.0.1:8001/v1/jobs/job-ci-0001 \
+              > /tmp/job.json
+            job_status="$(python3 -c 'import json; print(json.load(open("/tmp/job.json", encoding="utf-8"))["status"])')"
+            if [ "${job_status}" = "succeeded" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/job.json", encoding="utf-8") as handle:
+              job = json.load(handle)
+          assert job["status"] == "succeeded"
+          assert job["output_path"] is None
+          assert job["audio_duration"] is None
+          assert "not loaded" in job["message"]
+          PY
+
+          docker rm --force voxcpm-worker-ci >/dev/null
+          start_worker
+          wait_for_container_health
+
+          curl --fail --silent \
+            --header "X-Worker-Key: ${WORKER_API_KEY}" \
+            http://127.0.0.1:8001/v1/jobs/job-ci-0001 \
+            > /tmp/restored-job.json
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/restored-job.json", encoding="utf-8") as handle:
+              job = json.load(handle)
+          assert job["id"] == "job-ci-0001"
+          assert job["status"] == "succeeded"
+          PY
