@@ -1,6 +1,6 @@
 # VoxCPM Studio
 
-Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Web UI Fase 1–3 serta API/worker simulasi Fase 4 berjalan lokal. Belum terhubung ke VoxCPM2 atau RunPod dan belum menghasilkan audio AI.**
+Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Fase 1–4 selesai: Web UI demo, API lokal, worker simulasi, dan image container telah diverifikasi. Belum terhubung ke VoxCPM2 atau RunPod dan belum menghasilkan audio AI.**
 
 ## Menjalankan aplikasi
 
@@ -70,7 +70,7 @@ npm run build
 
 Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, kontrak health/readiness, autentikasi worker, idempotensi, antrean tunggal, pembatalan, dan kegagalan simulasi.
 
-Integrasi Next.js ↔ FastAPI telah diuji lokal: sesi, pekerjaan normal/idempoten, polling, unggah serta baca ulang WAV, cloning simulasi, pembatalan, penghapusan referensi, dan stop sesi. Image Docker belum dibangun karena Docker tidak tersedia pada mesin pengembangan ini.
+Integrasi Next.js ↔ FastAPI telah diuji lokal: sesi, pekerjaan normal/idempoten, polling, unggah serta baca ulang WAV, cloning simulasi, pembatalan, penghapusan referensi, dan stop sesi. Image Docker juga berhasil dibangun dan diuji pada [GitHub Actions](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742), termasuk health check dan persistensi setelah restart.
 
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 
@@ -90,6 +90,7 @@ worker/app/               Worker FastAPI mode simulasi
 worker/tests/             Pengujian kontrak worker
 docs/                     API lokal dan rancangan kontrol RunPod
 tests/                    Pengujian frontend dan backend Node
+.github/workflows/        Validasi otomatis image dan kontrak container
 ```
 
 Halaman memakai kontrak `StudioService` melalui provider. Adapter API dapat menggantikan service demo pada langkah berikutnya setelah autentikasi pengguna Web UI ditetapkan. Kontrak dan penyimpanan server telah tersedia di Fase 4. Gunakan [progress.md](progress.md) sebagai urutan pekerjaan dan catatan keputusan; rancangan shutdown cloud ada di [docs/runpod-worker-design.md](docs/runpod-worker-design.md).

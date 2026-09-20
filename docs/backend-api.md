@@ -81,7 +81,7 @@ Worker memvalidasi mode, batas teks, deskripsi Voice Design, referensi cloning, 
 
 ## Docker
 
-Image belum dapat dibangun di mesin pengembangan saat ini karena Docker tidak terpasang. Dockerfile memakai Python `3.12.11-slim-bookworm`, dependensi terkunci, user non-root, dan health check:
+Docker tidak terpasang pada mesin pengembangan, tetapi image telah berhasil dibangun dan diuji pada [GitHub Actions run 35540568742](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742). Pemeriksaan otomatis mencakup user non-root, liveness, autentikasi, readiness, pekerjaan simulasi tanpa audio, persistensi setelah restart, dan Docker health check. Dockerfile memakai Python `3.12.11-slim-bookworm` serta dependensi terkunci:
 
 ```powershell
 docker build --file worker/Dockerfile --tag voxcpm-worker:simulation worker

@@ -1,14 +1,14 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–3 selesai; Fase 4 aktif dan backend lokal sudah berfungsi.**
-Fase aktif: **Fase 4 — validasi build container masih menunggu lingkungan Docker.**
+Status: **Fase 0–4 selesai; Fase 5 menunggu saldo RunPod dan batas biaya.**
+Fase aktif: **Persiapan Fase 5 — akun RunPod dapat diakses, tetapi saldo masih $0,00 sehingga belum ada resource berbayar yang dibuat.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
 Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice design menggunakan VoxCPM2 dengan GPU RunPod yang dinyalakan sesuai kebutuhan. Nama kerja aplikasi: **VoxCPM Studio**.
 
-**Prioritas saat ini adalah frontend. Pengguna belum mempunyai saldo RunPod.** Seluruh pengerjaan Fase 1–3 harus dapat dijalankan di komputer lokal tanpa akun GPU aktif, API key RunPod, model terunduh, atau biaya cloud.
+**Pekerjaan lokal tanpa biaya telah diprioritaskan dan Fase 1–4 selesai. Pengguna belum mempunyai saldo RunPod.** Fase 5 tidak boleh membuat resource berbayar sampai saldo, batas harga, durasi uji, dan strategi storage siap.
 
 - Frontend: Next.js, React, TypeScript, Tailwind CSS; gunakan shadcn/ui bila sesuai kebutuhan komponen.
 - Antarmuka berbahasa Indonesia; fokus pada penggunaan desktop, tetap nyaman di layar kecil.
@@ -163,7 +163,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [x] Melindungi endpoint worker dan endpoint pengelolaan sesi; rahasia hanya berada di backend.
 - [x] Membuat Dockerfile dan startup script dengan versi dependensi yang terkunci.
 - [x] Mengatur lokasi model/cache, referensi, serta output pada storage persisten; memeriksa mount sebelum menjalankan worker.
-- [ ] Menguji build container dan alur API yang tidak membutuhkan GPU jika lingkungan lokal mendukung. **Alur API lulus; build container belum dijalankan karena Docker tidak terpasang.**
+- [x] Menguji build container dan alur API yang tidak membutuhkan GPU. Docker tidak tersedia lokal, sehingga validasi dijalankan pada GitHub Actions tanpa membuat resource RunPod.
 - [x] Merancang pengawas shutdown di cloud, tenggat tersimpan, pemulihan setelah restart, dan pemeriksaan hasil penghentian.
 - [x] Mendokumentasikan konfigurasi RunPod yang dibutuhkan tanpa membuat resource berbayar.
 
@@ -175,7 +175,8 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Endpoint pengelolaan aplikasi dan worker sama-sama menghasilkan `401` tanpa kunci yang tepat. Kunci berbeda dan tidak memakai `NEXT_PUBLIC_*`.
 - 15/15 pengujian Node dan 4/4 pengujian worker lulus. TypeScript serta ESLint lulus.
 - Seluruh wheel produksi yang dikunci tersedia untuk target Linux x86_64 / CPython 3.12 yang dipakai Dockerfile.
-- Build Next.js lulus dan menemukan sepuluh route API dinamis. Build container belum dapat diperiksa karena perintah `docker` tidak tersedia.
+- Build Next.js lulus dan menemukan sepuluh route API dinamis.
+- [GitHub Actions run 35540568742](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742) berhasil membangun image worker dari nol, menjalankan container sebagai UID `10001`, memverifikasi liveness, penolakan tanpa kunci, readiness terautentikasi, pekerjaan simulasi tanpa audio, persistensi setelah restart, dan status Docker `healthy`.
 - Uji integrasi lokal Next.js ↔ FastAPI lulus: health/readiness, start/stop sesi, pekerjaan normal dan idempoten, polling, unggah/baca ulang WAV 256.044 byte, cloning simulasi, cancel, serta hapus referensi. Tidak ada audio sintesis yang dibuat.
 - `docs/backend-api.md` menjelaskan operasi lokal; `docs/runpod-worker-design.md` merinci lease, deadline cloud, retry stop, verifikasi penghentian, storage, dan keamanan tanpa membuat resource berbayar.
 
@@ -183,9 +184,11 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** backend dan kontrak worker dapat diuji secara lokal. Container siap untuk pengujian GPU berikutnya. Inference VoxCPM2 tetap belum dianggap lolos sebelum diuji pada GPU.
 
+**Status fase:** selesai. Seluruh checklist wajib telah lulus, termasuk build dan health check container pada lingkungan Linux Docker di GitHub Actions.
+
 ## 8. Fase 5 — Integrasi RunPod setelah saldo tersedia
 
-**Prasyarat:** saldo tersedia, konfigurasi akun siap, serta batas harga dan durasi pengujian ditetapkan bersama pengguna. Tidak ada resource berbayar yang dibuat sebagai bagian fase frontend.
+**Prasyarat:** saldo tersedia, konfigurasi akun siap, serta batas harga dan durasi pengujian ditetapkan bersama pengguna. Pemeriksaan read-only pada 21 September 2026 menunjukkan saldo `$0,00` dan pemakaian `$0/jam`; belum ada resource berbayar yang dibuat.
 
 ### 5.1 Infrastruktur dan pemulihan sesi
 
@@ -270,9 +273,12 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 20 September 2026 | Fase 2 selesai: Studio, pustaka referensi, riwayat, Sesi GPU, dan Pengaturan tersedia. | Tinjauan desktop/ponsel serta kontrol utama melalui Chrome. | Hasil sintesis dan unduhan audio nyata menunggu model/GPU. |
 | 20 September 2026 | Fase 3 selesai: service simulasi, persistensi lokal, skenario kegagalan, dan pembatalan. | 12/12 pengujian otomatis; alur WAV → cloning demo → riwayat, refresh, edit/hapus, dan reset diverifikasi. | Backend/worker lokal pada Fase 4 belum dikerjakan; saldo RunPod belum diperlukan untuk fase tersebut. |
 | 21 September 2026 | API Next.js, penyimpanan server, worker FastAPI simulasi, Dockerfile, dan rancangan kontrol cloud ditambahkan. | 15/15 tes Node, 4/4 tes worker, lint, TypeScript, build Next.js, serta integrasi dua proses lulus. | Docker tidak tersedia sehingga image belum dibangun. Web UI belum dialihkan ke API agar kunci backend tidak bocor ke browser. |
+| 21 September 2026 | Fase 4 selesai melalui validasi container di GitHub Actions tanpa memakai RunPod. | Image berhasil dibangun; container non-root, autentikasi, simulasi, restart/persistensi, dan Docker health check lulus pada run 35540568742. | Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah autentikasi sesi `HttpOnly` dan adapter API Web UI secara lokal sambil menunggu prasyarat Fase 5. |
 
 ## 13. Langkah pengerjaan berikutnya
 
-**Validasi Dockerfile saat Docker tersedia**, lalu tutup Fase 4 jika build dan health check container lulus. Sesudah itu, tentukan autentikasi sesi Web UI agar adapter `StudioService` dapat memakai `/api/v1/*` tanpa mengekspos kunci server. Fase 5 tetap menunggu saldo, konfigurasi akun, dan batas biaya; belum ada resource RunPod yang dibuat.
+**Rekomendasi selama saldo RunPod masih $0,00:** implementasikan autentikasi pengguna lokal berbasis sesi `HttpOnly` dan adapter API untuk `StudioService`, lalu uji Web UI → Next.js API → worker simulasi dari browser. Pekerjaan ini tidak memerlukan GPU dan menutup celah antara UI demo dengan backend yang sudah ada.
+
+Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Jangan membuat resource GPU hanya karena console sudah dapat dibuka.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.
