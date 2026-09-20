@@ -9,3 +9,8 @@ coverage/
 *.log
 .DS_Store
 test-results/
+.data/
+.venv/
+worker/.pytest_cache/
+worker/**/__pycache__/
+worker/**/*.pyc

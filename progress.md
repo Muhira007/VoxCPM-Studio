@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
-Terakhir diperbarui: 20 September 2026
-Status: **Fase 0–3 selesai; frontend Web UI lokal tersedia dalam Mode Demo.**
-Fase berikutnya: **Fase 4 — Backend aplikasi dan worker simulasi tanpa GPU berbayar**, belum dimulai.
+Terakhir diperbarui: 21 September 2026
+Status: **Fase 0–3 selesai; Fase 4 aktif dan backend lokal sudah berfungsi.**
+Fase aktif: **Fase 4 — validasi build container masih menunggu lingkungan Docker.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -148,24 +148,38 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 - Metadata versi 1 memakai `localStorage`; berkas audio memakai IndexedDB. Unggahan demo tidak melakukan permintaan ke cloud. Gunakan satu tab; sinkronisasi antartab belum diterapkan.
 - Reload menonaktifkan sesi dan membatalkan pekerjaan yang belum selesai. Draft, preferensi, metadata, dan audio referensi dipulihkan.
-- Tarif GPU adalah angka contoh. Timer browser belum melindungi biaya cloud; belum ada integrasi RunPod, API backend, worker, atau pengujian kualitas suara.
+- Tarif GPU adalah angka contoh. Timer browser belum melindungi biaya cloud; API backend dan worker simulasi sudah ada, tetapi belum ada integrasi RunPod, inferensi model, atau pengujian kualitas suara.
 - Pengujian browser dilakukan di Chrome, bukan sertifikasi lintas browser atau audit aksesibilitas formal.
 - WebMCP ditambahkan sebagai peningkatan opsional dengan deteksi dukungan. Verifikasi registrasi/pemanggilan dalam konteks WebMCP yang mendukung belum dilakukan; tidak menghalangi demo lokal dan tidak diklaim telah lolos.
 
 ## 7. Fase 4 — Backend aplikasi dan persiapan worker tanpa GPU berbayar
 
-- [ ] Mengimplementasikan API aplikasi di Next.js sesuai kontrak frontend.
-- [ ] Menetapkan penyimpanan metadata pekerjaan, pustaka suara, konfigurasi, dan lokasi berkas untuk penggunaan pribadi.
-- [ ] Menyimpan metadata penting agar tidak bergantung pada umur Pod GPU.
-- [ ] Membuat kerangka FastAPI worker dengan endpoint health, kesiapan model, dan pekerjaan sintesis.
-- [ ] Menyediakan backend simulasi worker agar kontrak API dapat diuji tanpa GPU.
-- [ ] Menambahkan validasi permintaan, ID pekerjaan, timeout, pembatalan, dan penanganan retry tanpa duplikasi.
-- [ ] Melindungi endpoint worker dan endpoint pengelolaan sesi; rahasia hanya berada di backend.
-- [ ] Membuat Dockerfile dan startup script dengan versi dependensi yang terkunci.
-- [ ] Mengatur lokasi model/cache, referensi, serta output pada storage persisten; memeriksa mount sebelum menjalankan worker.
-- [ ] Menguji build container dan alur API yang tidak membutuhkan GPU jika lingkungan lokal mendukung.
-- [ ] Merancang pengawas shutdown di cloud, tenggat tersimpan, pemulihan setelah restart, dan pemeriksaan hasil penghentian.
-- [ ] Mendokumentasikan konfigurasi RunPod yang dibutuhkan tanpa membuat resource berbayar.
+- [x] Mengimplementasikan API aplikasi di Next.js sesuai kontrak frontend.
+- [x] Menetapkan penyimpanan metadata pekerjaan, pustaka suara, konfigurasi, dan lokasi berkas untuk penggunaan pribadi.
+- [x] Menyimpan metadata penting agar tidak bergantung pada umur Pod GPU.
+- [x] Membuat kerangka FastAPI worker dengan endpoint health, kesiapan model, dan pekerjaan sintesis.
+- [x] Menyediakan backend simulasi worker agar kontrak API dapat diuji tanpa GPU.
+- [x] Menambahkan validasi permintaan, ID pekerjaan, timeout, pembatalan, dan penanganan retry tanpa duplikasi.
+- [x] Melindungi endpoint worker dan endpoint pengelolaan sesi; rahasia hanya berada di backend.
+- [x] Membuat Dockerfile dan startup script dengan versi dependensi yang terkunci.
+- [x] Mengatur lokasi model/cache, referensi, serta output pada storage persisten; memeriksa mount sebelum menjalankan worker.
+- [ ] Menguji build container dan alur API yang tidak membutuhkan GPU jika lingkungan lokal mendukung. **Alur API lulus; build container belum dijalankan karena Docker tidak terpasang.**
+- [x] Merancang pengawas shutdown di cloud, tenggat tersimpan, pemulihan setelah restart, dan pemeriksaan hasil penghentian.
+- [x] Mendokumentasikan konfigurasi RunPod yang dibutuhkan tanpa membuat resource berbayar.
+
+**Hasil verifikasi Fase 4, 21 September 2026:**
+
+- Next.js menyediakan health, sesi, perpanjangan, pekerjaan, polling, cancel, pustaka referensi, audio referensi, dan pengaturan melalui `/api/v1/*`.
+- Metadata versi 1 ditulis atomik ke `.data/studio-state.json`; referensi dan output berada di direktori terpisah. Riwayat dibatasi 100 pekerjaan.
+- Worker FastAPI memisahkan liveness dari readiness, menandai pekerjaan aktif gagal setelah restart, membatasi satu pekerjaan, serta menolak referensi di luar mount.
+- Endpoint pengelolaan aplikasi dan worker sama-sama menghasilkan `401` tanpa kunci yang tepat. Kunci berbeda dan tidak memakai `NEXT_PUBLIC_*`.
+- 15/15 pengujian Node dan 4/4 pengujian worker lulus. TypeScript serta ESLint lulus.
+- Seluruh wheel produksi yang dikunci tersedia untuk target Linux x86_64 / CPython 3.12 yang dipakai Dockerfile.
+- Build Next.js lulus dan menemukan sepuluh route API dinamis. Build container belum dapat diperiksa karena perintah `docker` tidak tersedia.
+- Uji integrasi lokal Next.js ↔ FastAPI lulus: health/readiness, start/stop sesi, pekerjaan normal dan idempoten, polling, unggah/baca ulang WAV 256.044 byte, cloning simulasi, cancel, serta hapus referensi. Tidak ada audio sintesis yang dibuat.
+- `docs/backend-api.md` menjelaskan operasi lokal; `docs/runpod-worker-design.md` merinci lease, deadline cloud, retry stop, verifikasi penghentian, storage, dan keamanan tanpa membuat resource berbayar.
+
+**Batas saat ini:** Web UI masih memakai service demo browser. API key server tidak boleh dipindahkan ke frontend; adapter API menunggu autentikasi pengguna berbasis sesi `HttpOnly` atau keputusan deployment lokal. Worker Docker masih mode simulasi dan belum berisi VoxCPM2/CUDA.
 
 **Kriteria selesai:** backend dan kontrak worker dapat diuji secara lokal. Container siap untuk pengujian GPU berikutnya. Inference VoxCPM2 tetap belum dianggap lolos sebelum diuji pada GPU.
 
@@ -255,9 +269,10 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 20 September 2026 | Fase 1 selesai: fondasi Next.js, lima route, desain, komponen bersama, dan panduan lokal. | Build, lint, TypeScript lulus; seluruh halaman dapat dibuka. | Tetap lokal, tanpa hosting atau resource cloud. |
 | 20 September 2026 | Fase 2 selesai: Studio, pustaka referensi, riwayat, Sesi GPU, dan Pengaturan tersedia. | Tinjauan desktop/ponsel serta kontrol utama melalui Chrome. | Hasil sintesis dan unduhan audio nyata menunggu model/GPU. |
 | 20 September 2026 | Fase 3 selesai: service simulasi, persistensi lokal, skenario kegagalan, dan pembatalan. | 12/12 pengujian otomatis; alur WAV → cloning demo → riwayat, refresh, edit/hapus, dan reset diverifikasi. | Backend/worker lokal pada Fase 4 belum dikerjakan; saldo RunPod belum diperlukan untuk fase tersebut. |
+| 21 September 2026 | API Next.js, penyimpanan server, worker FastAPI simulasi, Dockerfile, dan rancangan kontrol cloud ditambahkan. | 15/15 tes Node, 4/4 tes worker, lint, TypeScript, build Next.js, serta integrasi dua proses lulus. | Docker tidak tersedia sehingga image belum dibangun. Web UI belum dialihkan ke API agar kunci backend tidak bocor ke browser. |
 
 ## 13. Langkah pengerjaan berikutnya
 
-**Frontend Fase 1–3 sudah dapat dicoba.** Jalankan `npm run dev` lalu buka `http://127.0.0.1:3000`; petunjuk lengkap tersedia di `README.md`. Langkah implementasi berikutnya adalah Fase 4: mulai dengan API aplikasi dan worker simulasi lokal, kemudian uji kontrak tanpa GPU. Fase 5 menunggu saldo, konfigurasi akun, dan batas biaya; belum ada resource RunPod yang dibuat.
+**Validasi Dockerfile saat Docker tersedia**, lalu tutup Fase 4 jika build dan health check container lulus. Sesudah itu, tentukan autentikasi sesi Web UI agar adapter `StudioService` dapat memakai `/api/v1/*` tanpa mengekspos kunci server. Fase 5 tetap menunggu saldo, konfigurasi akun, dan batas biaya; belum ada resource RunPod yang dibuat.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.
