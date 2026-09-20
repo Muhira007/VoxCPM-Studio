@@ -1,0 +1,263 @@
+# Progress — VoxCPM Studio
+
+Terakhir diperbarui: 20 September 2026
+Status: **Fase 0–3 selesai; frontend Web UI lokal tersedia dalam Mode Demo.**
+Fase berikutnya: **Fase 4 — Backend aplikasi dan worker simulasi tanpa GPU berbayar**, belum dimulai.
+
+## 1. Tujuan dan batas pekerjaan saat ini
+
+Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice design menggunakan VoxCPM2 dengan GPU RunPod yang dinyalakan sesuai kebutuhan. Nama kerja aplikasi: **VoxCPM Studio**.
+
+**Prioritas saat ini adalah frontend. Pengguna belum mempunyai saldo RunPod.** Seluruh pengerjaan Fase 1–3 harus dapat dijalankan di komputer lokal tanpa akun GPU aktif, API key RunPod, model terunduh, atau biaya cloud.
+
+- Frontend: Next.js, React, TypeScript, Tailwind CSS; gunakan shadcn/ui bila sesuai kebutuhan komponen.
+- Antarmuka berbahasa Indonesia; fokus pada penggunaan desktop, tetap nyaman di layar kecil.
+- Next.js server nantinya menangani kontrol aplikasi dan komunikasi RunPod. FastAPI pada GPU worker nantinya menjalankan VoxCPM2.
+- Gunakan penyedia data simulasi terlebih dahulu, dengan kontrak yang dapat dipakai kembali oleh integrasi sebenarnya.
+- Jangan menandai TTS, cloning, voice design, pembayaran, atau kontrol GPU sebagai berfungsi nyata hanya karena simulasinya berjalan.
+- MVP berfokus pada satu pengguna dan satu GPU worker. Multi-user, dubbing, voice changer, musik, dan sound effects berada di luar MVP.
+
+## 2. Aturan checklist dan pembaruan progres
+
+- `[x]` berarti hasil pekerjaan sudah ada dan sudah diperiksa sesuai kriteria fase.
+- `[ ]` berarti belum dikerjakan, sedang dikerjakan, atau belum lolos pemeriksaan. Jika sedang dikerjakan, tambahkan catatan singkat.
+- Tugas UI dengan data simulasi harus disebut sebagai **simulasi**, bukan integrasi selesai.
+- Setiap sesi pengerjaan memperbarui checklist, tanggal, hasil verifikasi, kendala, dan langkah berikutnya.
+- Bila implementasi berubah, perbarui rencana agar mencerminkan keputusan terakhir.
+- Fase dinyatakan selesai setelah seluruh pekerjaan wajib dan kriteria selesainya terpenuhi.
+
+## 3. Fase 0 — Konteks dan perencanaan
+
+- [x] Memahami kebutuhan: Web UI pribadi, TTS Indonesia, cloning, voice design, riwayat, serta GPU sesuai kebutuhan.
+- [x] Meninjau percakapan awal dan mencatat koreksi arsitektur serta batas kemampuan model.
+- [x] Memeriksa workspace `D:\Project\tts-runpod`: kosong sebelum dokumen ini dibuat.
+- [x] Menetapkan urutan frontend terlebih dahulu karena saldo RunPod belum tersedia.
+- [x] Menyusun fase, checklist, batas MVP, dan kriteria selesai di `progress.md`.
+
+**Hasil pada akhir Fase 0:** dokumen rencana tersedia. Implementasi frontend kemudian diselesaikan pada Fase 1–3; rincian verifikasi tercatat di bawah.
+
+## 4. Fase 1 — Fondasi frontend Web UI
+
+### 1.1 Inisialisasi aplikasi
+
+- [x] Membuat proyek Next.js dengan App Router, React, TypeScript, dan Tailwind CSS.
+- [x] Menetapkan package manager dan menyimpan lockfile.
+- [x] Menyediakan perintah development, build, lint, dan pemeriksaan TypeScript.
+- [x] Menambahkan `.gitignore`, README untuk menjalankan aplikasi lokal, dan contoh konfigurasi tanpa rahasia.
+- [x] Membuat struktur folder halaman, komponen, tipe data, dan penyedia data simulasi yang mudah dipahami.
+
+### 1.2 Kerangka dan desain
+
+- [x] Membuat navigasi: **Studio**, **Pustaka Suara**, **Riwayat**, **Sesi GPU**, dan **Pengaturan**.
+- [x] Menetapkan warna, tipografi, jarak, bentuk input, tombol, kartu, serta indikator status yang konsisten.
+- [x] Membuat kerangka halaman responsif dengan navigasi yang berfungsi.
+- [x] Menampilkan label **Mode Demo** dan penjelasan singkat bahwa GPU serta biaya masih disimulasikan.
+- [x] Menyiapkan komponen bersama untuk loading, empty state, pesan error, notifikasi, dan dialog.
+
+**Kriteria selesai:** aplikasi dapat dijalankan dan dibangun secara lokal; seluruh halaman dapat dibuka; tata letak dasar nyaman digunakan; tidak membutuhkan RunPod.
+
+**Hasil terverifikasi:** Next.js App Router, npm + lockfile, lima halaman lokal, komponen dialog Radix, tipografi Geist lokal, ikon Lucide, dan Tailwind tersedia. `README.md` serta `.env.example` menjelaskan cara menjalankan tanpa kredensial. Panduan Next.js di `node_modules/next/dist/docs/` dibaca sesuai `AGENTS.md`.
+
+## 5. Fase 2 — Tampilan halaman utama
+
+### 2.1 Studio
+
+- [x] Membuat editor teks dengan penghitung karakter, contoh naskah Indonesia, dan validasi input kosong.
+- [x] Menyediakan pilihan mode: TTS biasa, Voice Design, Cloning dengan Gaya, dan Hi-Fi Cloning.
+- [x] Membuat pemilihan suara dari pustaka serta input referensi audio sesuai mode.
+- [x] Menyediakan deskripsi suara untuk Voice Design dan transkrip referensi untuk Hi-Fi Cloning.
+- [x] Menyediakan preset gaya sederhana, misalnya Natural, Tenang, Ceria, dan Dramatis.
+- [x] Menonaktifkan kontrol gaya saat Hi-Fi dipilih, disertai penjelasan singkat mengenai batas mode tersebut.
+- [x] Membuat tombol aksi demo, tampilan antrean/progres, hasil audio, serta area pesan kegagalan.
+- [x] Membuat audio player dan tombol unduh yang hanya aktif jika memang ada berkas audio.
+
+### 2.2 Pustaka Suara
+
+- [x] Membuat daftar suara, pencarian, detail suara, dan keadaan pustaka kosong.
+- [x] Membuat form nama, catatan, dan unggah referensi audio.
+- [x] Menyediakan preview audio lokal, informasi durasi, serta validasi format dan ukuran.
+- [x] Menyediakan edit dan hapus referensi yang jelas bagi pengguna.
+- [x] Membedakan suara contoh, referensi milik pengguna, dan suara hasil desain yang nantinya disimpan.
+
+### 2.3 Riwayat
+
+- [x] Menampilkan teks, suara, mode, waktu, status, dan durasi audio bila tersedia.
+- [x] Menyediakan detail pekerjaan, pencarian/filter, gunakan ulang pengaturan, dan unduh bila hasil tersedia.
+- [x] Menyediakan tampilan untuk pekerjaan berhasil, gagal, dibatalkan, dan belum mempunyai hasil.
+
+### 2.4 Sesi GPU dan Pengaturan
+
+- [x] Menampilkan status GPU, profil GPU contoh, waktu sesi, countdown, dan estimasi biaya demo.
+- [x] Membuat kontrol simulasi Mulai Sesi, Akhiri Sesi, dan Perpanjang Waktu.
+- [x] Menyediakan pengaturan batas sesi, idle timeout, dan batas harga GPU sebagai rancangan konfigurasi.
+- [x] Membuat halaman preferensi aplikasi tanpa meminta API key RunPod pada tahap demo.
+- [x] Menjelaskan bahwa status Pod hidup dan model siap menghasilkan audio adalah dua kondisi berbeda.
+
+**Kriteria selesai:** seluruh tampilan MVP tersedia dan konsisten. Setiap kontrol menunjukkan dengan jujur apakah aktif, belum tersedia, atau masih simulasi.
+
+**Hasil terverifikasi:** seluruh halaman dan kontrol demo tersedia. Pustaka memisahkan inspirasi deskripsi dari rekaman unggahan. Tipe `designed` disiapkan dalam kontrak; penyimpanan suara desain nyata menunggu inferensi. Player referensi memutar berkas asli lokal. Player/unduh hasil sintesis disiapkan tetapi tetap nonaktif jika tidak ada berkas; tidak ada audio keluaran contoh yang diklaim sebagai hasil AI.
+
+## 6. Fase 3 — Interaksi frontend dengan data simulasi
+
+### 3.1 Kontrak data dan skenario demo
+
+- [x] Mendefinisikan tipe `Voice`, `SynthesisRequest`, `SynthesisJob`, `GpuSession`, dan `AppSettings`.
+- [x] Memisahkan logika komponen dari penyedia data agar mock dapat diganti dengan API tanpa menulis ulang halaman.
+- [x] Memodelkan status GPU: off, provisioning, loading model, ready, stopping, dan error.
+- [x] Memodelkan status pekerjaan secara terpisah: queued, running, succeeded, failed, dan cancelled.
+- [x] Menyimulasikan alur mulai sesi → pemuatan model → siap → antrean pekerjaan → hasil/error → akhir sesi.
+- [x] Menyediakan skenario GPU tidak tersedia, pemuatan lambat, kegagalan pekerjaan, dan koneksi terputus.
+- [x] Mencegah klik berulang membuat sesi atau pekerjaan ganda.
+- [x] Menggunakan audio contoh yang sumbernya jelas jika diperlukan; jangan mengakuinya sebagai hasil dari teks yang baru diketik.
+
+### 3.2 Penyimpanan lokal dan pengalaman penggunaan
+
+- [x] Menyimpan draft teks serta preferensi yang tidak sensitif secara lokal, dengan versi format data.
+- [x] Menyimpan metadata dan referensi audio lokal menggunakan penyimpanan yang sesuai, misalnya IndexedDB untuk berkas.
+- [x] Memastikan draft tetap tersedia setelah refresh dan referensi audio dapat diputar kembali.
+- [x] Menyediakan penghapusan data demo/lokal yang jelas cakupannya.
+- [x] Memastikan unggah pada mode demo hanya diproses lokal dan tidak dikirim ke layanan cloud.
+- [x] Menangani navigasi keyboard, label input, fokus dialog, kontras, dan tampilan responsif.
+
+### 3.3 Verifikasi frontend
+
+- [x] Memeriksa alur utama: unggah referensi → isi teks → jalankan simulasi → lihat hasil/status → buka riwayat.
+- [x] Memeriksa pembatalan, percobaan ulang, input tidak valid, refresh, dan pemulihan draft.
+- [x] Memeriksa countdown demo tanpa menganggapnya sebagai pengaman biaya sebenarnya.
+- [x] Menjalankan build, lint, dan pemeriksaan TypeScript; menyelesaikan error yang ditemukan.
+- [x] Menambahkan pengujian otomatis untuk alur berisiko seperti pekerjaan ganda dan transisi status bila diperlukan.
+- [x] Meninjau tampilan di browser pada ukuran desktop dan layar kecil.
+
+**Kriteria selesai:** frontend dapat dipakai untuk demonstrasi alur MVP dari awal sampai akhir, tanpa saldo RunPod. Integrasi GPU dan kualitas suara belum dinyatakan teruji.
+
+**Hasil verifikasi, 20 September 2026:**
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `npm run typecheck` | Lulus. |
+| `npm run lint` | Lulus tanpa error atau warning ESLint. |
+| `npm test` | 12/12 lulus: klik ganda, stop saat loading, pembatalan/retry, refresh, data rusak, tenggat, idle, perpanjangan maksimum, validasi/batas harga, kegagalan/koneksi terputus, GPU tidak tersedia, dan reset. |
+| `npm run build` | Lulus; seluruh route utama dan halaman not-found berhasil dibangun. |
+| Browser Chrome desktop | Kelima halaman dibuka; Studio, Riwayat, serta Sesi GPU ditinjau pada viewport desktop 1440 × 900. |
+| Browser Chrome layar kecil | Studio, Pengaturan, Pustaka Suara, dan menu diuji pada viewport 390 × 844. Studio tidak meluap secara horizontal. Escape menutup dialog dan fokus kembali ke pemicu. |
+| Input dan rekaman | Naskah kosong dan berkas `.txt` ditolak; WAV uji 8 detik berhasil dibaca, disimpan, diputar sesudah refresh, dipilih untuk cloning demo, diedit, dicari, dan dihapus. |
+| Alur pekerjaan | Simulasi selesai tanpa audio palsu; riwayat/detail tersedia; pembatalan berfungsi; Hi-Fi menonaktifkan gaya; perpanjangan, akhir sesi, serta skenario GPU tidak tersedia diverifikasi melalui UI. |
+| Reset | Data yang dibuat selama QA dihapus melalui UI; kembali ke 0 referensi lokal dan 0 pekerjaan, skenario Normal, serta draft awal. Tidak menghapus berkas asli pengguna. |
+
+**Keputusan dan batas yang tersisa:**
+
+- Metadata versi 1 memakai `localStorage`; berkas audio memakai IndexedDB. Unggahan demo tidak melakukan permintaan ke cloud. Gunakan satu tab; sinkronisasi antartab belum diterapkan.
+- Reload menonaktifkan sesi dan membatalkan pekerjaan yang belum selesai. Draft, preferensi, metadata, dan audio referensi dipulihkan.
+- Tarif GPU adalah angka contoh. Timer browser belum melindungi biaya cloud; belum ada integrasi RunPod, API backend, worker, atau pengujian kualitas suara.
+- Pengujian browser dilakukan di Chrome, bukan sertifikasi lintas browser atau audit aksesibilitas formal.
+- WebMCP ditambahkan sebagai peningkatan opsional dengan deteksi dukungan. Verifikasi registrasi/pemanggilan dalam konteks WebMCP yang mendukung belum dilakukan; tidak menghalangi demo lokal dan tidak diklaim telah lolos.
+
+## 7. Fase 4 — Backend aplikasi dan persiapan worker tanpa GPU berbayar
+
+- [ ] Mengimplementasikan API aplikasi di Next.js sesuai kontrak frontend.
+- [ ] Menetapkan penyimpanan metadata pekerjaan, pustaka suara, konfigurasi, dan lokasi berkas untuk penggunaan pribadi.
+- [ ] Menyimpan metadata penting agar tidak bergantung pada umur Pod GPU.
+- [ ] Membuat kerangka FastAPI worker dengan endpoint health, kesiapan model, dan pekerjaan sintesis.
+- [ ] Menyediakan backend simulasi worker agar kontrak API dapat diuji tanpa GPU.
+- [ ] Menambahkan validasi permintaan, ID pekerjaan, timeout, pembatalan, dan penanganan retry tanpa duplikasi.
+- [ ] Melindungi endpoint worker dan endpoint pengelolaan sesi; rahasia hanya berada di backend.
+- [ ] Membuat Dockerfile dan startup script dengan versi dependensi yang terkunci.
+- [ ] Mengatur lokasi model/cache, referensi, serta output pada storage persisten; memeriksa mount sebelum menjalankan worker.
+- [ ] Menguji build container dan alur API yang tidak membutuhkan GPU jika lingkungan lokal mendukung.
+- [ ] Merancang pengawas shutdown di cloud, tenggat tersimpan, pemulihan setelah restart, dan pemeriksaan hasil penghentian.
+- [ ] Mendokumentasikan konfigurasi RunPod yang dibutuhkan tanpa membuat resource berbayar.
+
+**Kriteria selesai:** backend dan kontrak worker dapat diuji secara lokal. Container siap untuk pengujian GPU berikutnya. Inference VoxCPM2 tetap belum dianggap lolos sebelum diuji pada GPU.
+
+## 8. Fase 5 — Integrasi RunPod setelah saldo tersedia
+
+**Prasyarat:** saldo tersedia, konfigurasi akun siap, serta batas harga dan durasi pengujian ditetapkan bersama pengguna. Tidak ada resource berbayar yang dibuat sebagai bagian fase frontend.
+
+### 5.1 Infrastruktur dan pemulihan sesi
+
+- [ ] Memeriksa harga aktual, ketersediaan GPU, data center, storage, dan kompatibilitas image.
+- [ ] Menentukan strategi storage; Network Volume biasa membatasi pilihan data center.
+- [ ] Menyiapkan API key hanya di environment backend, bukan browser atau variabel publik Next.js.
+- [ ] Mengintegrasikan buat/resume sesi, polling status, kesiapan model, dan akhiri sesi.
+- [ ] Membedakan stop dan terminate pada implementasi; hanya menghapus Pod setelah lokasi data persisten diverifikasi.
+- [ ] Menguji satu siklus deploy → muat model → sintesis → simpan hasil → akhiri sesi → deploy ulang.
+- [ ] Memastikan model tidak perlu diunduh ulang tanpa alasan dan dependensi tersedia setelah Pod dibuat ulang.
+- [ ] Mengukur cold start dan menunjukkan tahap kesiapan yang sebenarnya di UI.
+
+### 5.2 Pengaman penggunaan biaya
+
+- [ ] Menjalankan timer sebenarnya di cloud sehingga tetap bekerja ketika browser ditutup atau PC mati.
+- [ ] Mengaktifkan idle shutdown hanya ketika tidak ada pekerjaan berjalan atau antrean yang perlu diproses.
+- [ ] Menetapkan batas sesi maksimum dan perilaku pekerjaan saat tenggat mendekat agar biaya tidak diperpanjang tanpa batas.
+- [ ] Memastikan perpanjangan waktu memperbarui tenggat di cloud.
+- [ ] Memastikan kegagalan API penghentian terdeteksi, dicoba ulang secara terbatas, dan terlihat oleh pengguna.
+- [ ] Memverifikasi status penghentian pada RunPod; timer habis saja bukan bukti tagihan GPU telah berhenti.
+- [ ] Menampilkan estimasi biaya dengan jelas, termasuk waktu startup/idle dan biaya storage terpisah.
+
+**Kriteria selesai:** kontrol GPU bekerja nyata, data bertahan setelah sesi berakhir, dan shutdown berhasil diuji dengan browser tertutup serta PC pengguna tidak menjalankan pengawas lokal.
+
+## 9. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
+
+- [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
+- [ ] Menguji TTS Indonesia, voice design, cloning dengan gaya, dan Hi-Fi cloning secara terpisah.
+- [ ] Menyiapkan 20–30 naskah uji: narasi, dialog, rupiah, tanggal, singkatan, nama, dan campuran Indonesia–Inggris.
+- [ ] Menguji referensi audio bersih dan transkrip yang sesuai; menyediakan panduan input di UI.
+- [ ] Menguji efektivitas setiap preset gaya dan menghapus atau menandai preset yang belum konsisten.
+- [ ] Menyimpan referensi suara pilihan untuk menjaga identitas antar-generasi.
+- [ ] Menambahkan normalisasi teks Indonesia dan kamus pengucapan sederhana berdasarkan kesalahan nyata yang ditemukan.
+- [ ] Menangani teks panjang dengan pembagian segmen, jeda, dan penggabungan audio yang diperiksa lewat uji dengar.
+- [ ] Menyediakan regenerasi satu segmen tanpa mengulang seluruh naskah.
+- [ ] Mengaktifkan unduh WAV dan konversi MP3 hanya setelah alur berkas sebenarnya diuji.
+- [ ] Mengukur waktu proses, penggunaan VRAM, kegagalan/retry, dan biaya per menit audio yang layak dipakai.
+- [ ] Memeriksa alur MVP menyeluruh, keamanan endpoint, pemulihan pekerjaan, dan backup hasil penting.
+- [ ] Memperbarui README serta batas fitur berdasarkan hasil pengujian, bukan asumsi.
+
+**Kriteria selesai:** pengguna dapat menghasilkan dan mengunduh audio nyata, mengulang bagian yang bermasalah, serta mengakhiri sesi GPU dengan hasil tersimpan. Kualitas dan biaya dilaporkan dari pengukuran.
+
+## 10. Pengembangan lanjutan — di luar syarat selesai MVP
+
+- [ ] Editor dialog multi-speaker dengan suara dan gaya per segmen.
+- [ ] Perbandingan beberapa kandidat hasil audio.
+- [ ] Streaming audio setelah jalur sintesis biasa stabil.
+- [ ] Pemilihan GPU otomatis berdasarkan pengukuran biaya, kompatibilitas, dan lokasi storage.
+- [ ] Evaluasi Global Volumes untuk model yang perlu diakses lintas data center; periksa status beta dan karakteristik penyimpanannya saat implementasi.
+- [ ] Evaluasi vLLM-Omni atau engine lain jika antrean dan kebutuhan throughput membenarkannya.
+- [ ] Migrasi ke Serverless atau multi-user jika pola penggunaan sudah membutuhkan.
+
+## 11. Catatan teknis yang harus dipertahankan
+
+1. **Frontend dahulu:** mode demo tidak membuat resource, tidak mengonsumsi saldo, dan tidak mengklaim menghasilkan suara AI nyata.
+2. **Persistensi:** folder source di `/workspace` tidak otomatis membuat seluruh environment Python persisten. Dependensi harus tersedia dalam image atau environment yang sengaja dikelola.
+3. **Shutdown:** backend pada PC lokal tidak memenuhi kebutuhan shutdown ketika PC mati. Pengawas biaya harus berjalan di cloud.
+4. **Kemampuan model:** kontrol berbasis deskripsi tidak menjamin persentase emosi, pitch, atau kecepatan yang presisi. Jangan menjanjikan slider tersebut sebelum ada implementasi dan pengujian yang mendukung.
+5. **Mode cloning:** menurut audit dokumentasi, Hi-Fi mengabaikan instruksi gaya. Verifikasi ulang terhadap versi yang dipasang sebelum integrasi.
+6. **Identitas suara:** voice design dari deskripsi saja tidak menjamin suara yang sama pada setiap generasi; simpan referensi pilihan.
+7. **Storage:** stop, terminate, dan menghapus volume memiliki konsekuensi berbeda. Lokasi mount serta hasil tersimpan harus diverifikasi.
+8. **Biaya:** harga GPU per jam tidak cukup untuk menentukan pilihan termurah. Sertakan startup, idle, retry, storage, dan jumlah audio yang berhasil digunakan.
+9. **Keamanan:** API key RunPod tidak boleh berada di browser, localStorage, IndexedDB, repository, atau variabel `NEXT_PUBLIC_*`. Endpoint GPU yang dapat diakses lewat jaringan harus dilindungi.
+10. **Kualitas:** dukungan Indonesia dan sample rate 48 kHz belum membuktikan hasil setara ElevenLabs. Gunakan uji dengar dengan naskah yang relevan.
+
+Rujukan audit untuk diperiksa kembali saat integrasi:
+
+- [Repo upstream VoxCPM](https://github.com/OpenBMB/VoxCPM)
+- [Panduan mode dan parameter VoxCPM](https://voxcpm.readthedocs.io/en/latest/usage_guide.html)
+- [Pengelolaan Pod RunPod](https://docs.runpod.io/pods/manage-pods)
+- [Penyimpanan RunPod](https://docs.runpod.io/pods/storage/types)
+- [Network Volumes](https://docs.runpod.io/storage/network-volumes)
+- [Custom template RunPod](https://docs.runpod.io/pods/templates/create-custom-template)
+- [Harga RunPod](https://www.runpod.io/pricing)
+
+## 12. Log progres
+
+| Tanggal | Hasil | Verifikasi | Kendala / langkah berikutnya |
+| --- | --- | --- | --- |
+| 20 September 2026 | Konteks dan audit dirangkum; roadmap frontend terlebih dahulu dibuat. | Workspace diperiksa dan kosong sebelum dokumen dibuat. Tidak ada implementasi aplikasi yang ditandai selesai. | Mulai Fase 1: inisialisasi Next.js dan kerangka halaman. Saldo RunPod belum tersedia; tidak menghalangi Fase 1–4. |
+| 20 September 2026 | Fase 1 selesai: fondasi Next.js, lima route, desain, komponen bersama, dan panduan lokal. | Build, lint, TypeScript lulus; seluruh halaman dapat dibuka. | Tetap lokal, tanpa hosting atau resource cloud. |
+| 20 September 2026 | Fase 2 selesai: Studio, pustaka referensi, riwayat, Sesi GPU, dan Pengaturan tersedia. | Tinjauan desktop/ponsel serta kontrol utama melalui Chrome. | Hasil sintesis dan unduhan audio nyata menunggu model/GPU. |
+| 20 September 2026 | Fase 3 selesai: service simulasi, persistensi lokal, skenario kegagalan, dan pembatalan. | 12/12 pengujian otomatis; alur WAV → cloning demo → riwayat, refresh, edit/hapus, dan reset diverifikasi. | Backend/worker lokal pada Fase 4 belum dikerjakan; saldo RunPod belum diperlukan untuk fase tersebut. |
+
+## 13. Langkah pengerjaan berikutnya
+
+**Frontend Fase 1–3 sudah dapat dicoba.** Jalankan `npm run dev` lalu buka `http://127.0.0.1:3000`; petunjuk lengkap tersedia di `README.md`. Langkah implementasi berikutnya adalah Fase 4: mulai dengan API aplikasi dan worker simulasi lokal, kemudian uji kontrak tanpa GPU. Fase 5 menunggu saldo, konfigurasi akun, dan batas biaya; belum ada resource RunPod yang dibuat.
+
+Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.

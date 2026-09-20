@@ -1,0 +1,175 @@
+"use client";
+
+import { Check, Upload, UploadCloud } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { inspectAudio, saveAudio } from "@/lib/audio-storage";
+import { formatTime } from "@/lib/fixtures";
+import type { Voice } from "@/lib/types";
+import { useStudio } from "./studio-provider";
+import { ErrorMessage, Modal, useToast } from "./ui";
+
+export function VoiceDialog({
+  open,
+  onOpenChange,
+  voice,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  voice?: Voice;
+  onCreated?: (id: string) => void;
+}) {
+  const { service } = useStudio();
+  const toast = useToast();
+  const [name, setName] = useState(voice?.name ?? "");
+  const [description, setDescription] = useState(voice?.description ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [duration, setDuration] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function selectFile(selected: File | undefined) {
+    if (!selected) return;
+    setError("");
+    setBusy(true);
+    setFile(null);
+    try {
+      const seconds = await inspectAudio(selected);
+      setFile(selected);
+      setDuration(seconds);
+      if (!name) setName(selected.name.replace(/\.[^.]+$/, "").slice(0, 60));
+    } catch (problem) {
+      setError(
+        problem instanceof Error ? problem.message : "Audio gagal dibaca.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    if (!name.trim()) {
+      setError("Beri nama referensi suara ini.");
+      return;
+    }
+    if (!voice && !file) {
+      setError("Pilih rekaman referensi terlebih dahulu.");
+      return;
+    }
+    setError("");
+    setBusy(true);
+    try {
+      if (voice) service.editVoice(voice.id, name.trim(), description.trim());
+      else if (file) {
+        const id = crypto.randomUUID();
+        await saveAudio(id, file);
+        service.addVoice({
+          id,
+          name: name.trim(),
+          description: description.trim(),
+          source: "upload",
+          color: "green",
+          duration,
+          fileName: file.name,
+          createdAt: Date.now(),
+        });
+        onCreated?.(id);
+      }
+      toast(
+        voice
+          ? "Detail suara diperbarui."
+          : "Referensi tersimpan di browser ini.",
+      );
+      onOpenChange(false);
+    } catch (problem) {
+      setError(
+        problem instanceof Error
+          ? problem.message
+          : "Referensi gagal disimpan.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal
+      open={open}
+      onOpenChange={(next) => {
+        if (!busy) onOpenChange(next);
+      }}
+      title={voice ? "Edit referensi suara" : "Tambahkan suaramu"}
+      description="Rekaman disimpan lokal. Gunakan suara milikmu atau yang kamu punya izin untuk gunakan."
+    >
+      <form onSubmit={submit} className="form-stack">
+        {!voice && (
+          <label className={`upload-zone ${busy ? "is-busy" : ""}`}>
+            <input
+              type="file"
+              accept=".wav,.mp3,.flac,.m4a,.ogg,.webm,audio/*"
+              aria-label="Pilih berkas referensi"
+              disabled={busy}
+              onChange={(event) => void selectFile(event.target.files?.[0])}
+            />
+            <span className="upload-icon">
+              {file ? <Check size={25} /> : <UploadCloud size={27} />}
+            </span>
+            <strong>
+              {busy
+                ? "Membaca rekaman…"
+                : file
+                  ? file.name
+                  : "Pilih rekaman dari perangkat"}
+            </strong>
+            <span>
+              {file
+                ? `${formatTime(duration)} · ${(file.size / 1024 / 1024).toFixed(2)} MB`
+                : "WAV, MP3, FLAC, M4A, OGG, WebM · maks. 20 MB"}
+            </span>
+          </label>
+        )}
+        <label className="field-label">
+          Nama suara
+          <input
+            autoComplete="off"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={60}
+            placeholder="Contoh: Suara narasi saya"
+            required
+          />
+        </label>
+        <label className="field-label">
+          Catatan <span className="optional">opsional</span>
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            maxLength={300}
+            rows={3}
+            placeholder="Karakter suara, gaya, atau catatan rekaman…"
+          />
+        </label>
+        {!voice && (
+          <p className="small muted">
+            Rekaman bersih sepanjang 5–30 detik adalah titik awal yang baik.
+            Demo menerima audio hingga 5 menit untuk pratinjau.
+          </p>
+        )}
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        <div className="dialog-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+          >
+            Batal
+          </button>
+          <button type="submit" className="button primary" disabled={busy}>
+            <Upload size={16} />
+            {busy ? "Memproses…" : "Simpan referensi"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
