@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatTime, GPU_LABELS, GPU_PROFILES } from "@/lib/fixtures";
+import type { RunpodControlStatus } from "@/lib/runpod-control-types";
 import type {
   RunpodCloud,
   RunpodDryRunPlan,
@@ -53,6 +54,8 @@ export function GpuPage() {
     null,
   );
   const [runpodPlan, setRunpodPlan] = useState<RunpodDryRunPlan | null>(null);
+  const [runpodControl, setRunpodControl] =
+    useState<RunpodControlStatus | null>(null);
   const [runpodError, setRunpodError] = useState("");
   const [runpodLoading, setRunpodLoading] = useState(service.mode === "api");
   const [planLoading, setPlanLoading] = useState(service.mode === "api");
@@ -96,8 +99,12 @@ export function GpuPage() {
               "Status baca RunPod tidak dapat dimuat.",
             ),
           );
-        const payload = (await response.json()) as { overview: RunpodOverview };
+        const payload = (await response.json()) as {
+          overview: RunpodOverview;
+          control: RunpodControlStatus;
+        };
         setRunpodOverview(payload.overview);
+        setRunpodControl(payload.control);
       })
       .catch((problem) => {
         if (!controller.signal.aborted)
@@ -278,9 +285,65 @@ export function GpuPage() {
                   <Database size={18} />
                   <span>Data center</span>
                   <strong>{runpodOverview.catalog.dataCenterCount}</strong>
-                  <small>Storage belum dipilih</small>
+                  <small>Network Volume dipilih</small>
                 </div>
               </div>
+              {runpodControl && (
+                <div
+                  className="runpod-guard"
+                  aria-label="Pengaman kontrol RunPod"
+                >
+                  <div className="runpod-guard-heading">
+                    <div>
+                      <ShieldCheck size={18} />
+                      <span>
+                        <strong>Pengaman operasi berbayar</strong>
+                        <small>
+                          State machine siap diuji, mutation nyata tetap
+                          terkunci.
+                        </small>
+                      </span>
+                    </div>
+                    <span className="write-lock-badge">
+                      {runpodControl.writeEnabled ? "Aktif" : "Terkunci"}
+                    </span>
+                  </div>
+                  <div className="runpod-guard-grid">
+                    <div>
+                      <span>Storage persisten</span>
+                      <strong>
+                        Standard Network Volume · {runpodControl.storage.sizeGb}{" "}
+                        GB
+                      </strong>
+                      <small>
+                        {runpodControl.storage.mountPath} · estimasi $
+                        {runpodControl.storage.estimatedMonthlyUsd.toFixed(2)}
+                        /bulan
+                      </small>
+                    </div>
+                    <div>
+                      <span>Batas keras</span>
+                      <strong>
+                        {runpodControl.limits.maximumSessionMinutes} menit · $
+                        {runpodControl.limits.hardCostLimitUsd.toFixed(2)}
+                      </strong>
+                      <small>
+                        Idempotency, lease, reconcile, dan retry stop
+                      </small>
+                    </div>
+                    <div>
+                      <span>Prasyarat tersisa</span>
+                      <strong>
+                        {runpodControl.storage.volumeConfigured &&
+                        runpodControl.storage.dataCenterConfigured
+                          ? "Volume dan lokasi siap"
+                          : "Volume / lokasi belum diisi"}
+                      </strong>
+                      <small>Watchdog cloud belum dideploy</small>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="runpod-plan-controls">
                 <div>
                   <strong>Rencana RunPod</strong>

@@ -82,7 +82,7 @@ export interface RunpodDryRunPlan {
     noExistingPods: boolean;
     rateWithinLimit: boolean;
     gpuAvailable: boolean;
-    storageSelected: false;
+    storageSelected: boolean;
   };
   blockers: string[];
   notes: string[];

@@ -16,6 +16,25 @@ Tahap baca saja sudah diimplementasikan tanpa membuat resource:
 
 Verifikasi langsung pada 21 September 2026 menghasilkan `0` Pod, `48` tipe GPU yang lolos filter katalog, dan `33` data center. Harga yang terbaca untuk Community adalah A5000 `$0.16`, RTX 3090 `$0.22`, dan RTX 4090 `$0.34` per jam; Secure adalah `$0.27`, `$0.50`, dan `$0.74`. Ketersediaan berubah antar-snapshot, sehingga semua angka di UI diberi timestamp dan harus dibaca ulang tepat sebelum operasi berbayar. Saldo tidak diklaim oleh client karena endpoint yang dipakai tidak menyediakannya.
 
+## Implementasi control plane yang tetap terkunci
+
+Kerangka operasi tulis sudah diimplementasikan dan diuji tanpa akun berbayar:
+
+- `src/server/runpod-control-gateway.ts` adalah satu-satunya gateway create/start/stop. Setiap method mutation menolak dengan HTTP 423 sebelum `fetch` ketika `RUNPOD_WRITE_ENABLED` bukan `true`. Gateway tidak mempunyai operasi terminate.
+- `src/server/runpod-controller.ts` menyimpan operation ID, hash input, lease, Pod ID, `mutationAttemptedAt`, deadline absolut, retry, dan status verifikasi di `.data/runpod-control.json`. Retry start merekonsiliasi nama Pod deterministik; hasil create yang timeout tidak dikirim ulang sampai Pod ditemukan atau operator menyelesaikan rekonsiliasi.
+- Create memerlukan image digest, satu GPU, minimum CUDA 12.8, container disk 20 GB, serta Standard Network Volume di `/workspace`. Ia memeriksa cloud, data center, ketersediaan, batas harga UI, dan hard cost limit sebelum mutation.
+- Resume hanya memakai satu Pod terkelola yang cocok dengan image immutable. Pod akun lain atau lebih dari satu Pod terkelola menghentikan operasi untuk pemeriksaan manual.
+- Stop dibedakan dari terminate. Sesi baru dianggap berhenti setelah RunPod melaporkan `EXITED` atau `TERMINATED`; respons stop yang masih aktif menghasilkan backoff dan retry terbatas.
+- `GET/POST /api/v1/runpod/control` dilindungi autentikasi studio dan same-origin guard. Web UI hanya menampilkan status kunci dan belum menyediakan tombol mutation.
+
+Seluruh jalur di atas telah diuji dengan fake RunPod. Key aktual masih baca saja, `RUNPOD_WRITE_ENABLED=false`, data center dan volume ID belum diisi, serta akun tetap memiliki nol Pod. Pengawas deadline belum dideploy pada layanan cloud yang selalu aktif, jadi pengujian lokal belum memenuhi jaminan shutdown ketika PC mati.
+
+## Keputusan storage
+
+Strategi awal adalah **Standard Network Volume 30 GB** yang dipasang pada `/workspace`. Dengan tarif dokumentasi `$0.07/GB/bulan`, estimasinya `$2.10/bulan`. Network Volume bertahan secara independen dari lifecycle Pod sehingga model, cache, referensi, dan output dapat dipakai kembali setelah compute dihentikan atau dibuat ulang. Biaya storage tetap berjalan ketika Pod berhenti; volume dan data center aktual baru boleh dibuat setelah saldo tersedia dan lokasi dipilih dari katalog terbaru.
+
+Referensi: [Network Volumes](https://docs.runpod.io/storage/network-volumes), [jenis storage Pod](https://docs.runpod.io/pods/storage/types), [create Pod](https://docs.runpod.io/api-reference-v2/pods/create-a-pod), dan [transisi status Pod](https://docs.runpod.io/api-reference-v2/pods/trigger-a-pod-state-transition).
+
 ## Kepemilikan state
 
 Next.js bertindak sebagai control plane. Storage persisten menyimpan `podId`, status yang terakhir diverifikasi, batas harga, waktu mulai, `hardDeadline`, `idleDeadline`, pekerjaan, lokasi referensi/hasil, jumlah retry, serta versi state. GPU worker hanya menjalankan pekerjaan dan tidak menjadi sumber kebenaran untuk tagihan atau umur Pod.

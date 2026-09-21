@@ -334,7 +334,9 @@ export class RunpodClient {
       blockers.push(
         "Inventaris berisi Pod yang harus direkonsiliasi sebelum membuat sesi baru.",
       );
-    blockers.push("Strategi storage persisten dan data center belum dipilih.");
+    blockers.push(
+      "Network Volume Standard 30 GB sudah dipilih; volume dan data center aktual belum dikonfigurasi.",
+    );
     blockers.push(
       "Client RunPod hanya mengizinkan operasi baca; operasi create sengaja dinonaktifkan.",
     );
@@ -366,7 +368,7 @@ export class RunpodClient {
         noExistingPods: overview.inventory.podCount === 0,
         rateWithinLimit,
         gpuAvailable,
-        storageSelected: false,
+        storageSelected: true,
       },
       blockers,
       notes: [

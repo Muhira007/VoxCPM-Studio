@@ -1,0 +1,484 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { test } from "node:test";
+import type { RunpodOverview } from "../src/lib/runpod-types.ts";
+import type {
+  CreateRunpodPodInput,
+  ManagedRunpodPod,
+  RunpodControlGateway,
+} from "../src/server/runpod-control-gateway.ts";
+import { RunpodRestControlGateway } from "../src/server/runpod-control-gateway.ts";
+import {
+  RunpodController,
+  type RunpodControllerConfig,
+} from "../src/server/runpod-controller.ts";
+import { RunpodControlStore } from "../src/server/runpod-control-store.ts";
+
+const image =
+  "ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd";
+
+const config: RunpodControllerConfig = {
+  apiKey: "runpod_control_key_for_tests_123456789",
+  writeEnabled: true,
+  workerImage: image,
+  workerApiKey: "worker_control_key_for_tests_123456789",
+  cloud: "secure",
+  dataCenterId: "EU-CZ-1",
+  networkVolumeId: "volume_test_001",
+  hardCostLimitUsd: 1,
+  maximumSessionMinutes: 240,
+};
+
+function managedPod(
+  status: ManagedRunpodPod["status"] = "PROVISIONING",
+  overrides: Partial<ManagedRunpodPod> = {},
+): ManagedRunpodPod {
+  return {
+    id: "pod-test-001",
+    name: "voxcpm-studio-test",
+    status,
+    image,
+    gpuId: "NVIDIA GeForce RTX 3090",
+    cloud: "secure",
+    dataCenterId: "EU-CZ-1",
+    hourlyRate: 0.5,
+    actions: ["stop"],
+    locked: false,
+    ...overrides,
+  };
+}
+
+function overview(hourlyRate = 0.5, dataCenters = ["EU-CZ-1"]): RunpodOverview {
+  return {
+    mode: "read-only",
+    observedAt: "2026-09-21T00:00:00.000Z",
+    source: "RunPod REST API v2",
+    minimumCudaVersion: "12.8",
+    writesEnabled: false,
+    mutationAttempted: false,
+    inventory: { podCount: 0, pods: [] },
+    catalog: {
+      gpuTypeCount: 1,
+      dataCenterCount: 1,
+      dataCenters: [],
+      profiles: [
+        {
+          profileId: "3090",
+          runpodId: "NVIDIA GeForce RTX 3090",
+          name: "RTX 3090",
+          memoryGb: 24,
+          cudaVersions: ["12.8"],
+          offers: {
+            community: {
+              hourlyRate: 0.22,
+              availability: "MEDIUM",
+              dataCenters,
+            },
+            secure: {
+              hourlyRate,
+              availability: "MEDIUM",
+              dataCenters,
+            },
+          },
+        },
+      ],
+    },
+  };
+}
+
+class FakeGateway implements RunpodControlGateway {
+  pods: ManagedRunpodPod[];
+  createCalls = 0;
+  startCalls = 0;
+  stopCalls = 0;
+  stopFailures = 0;
+  stopResultStatus: ManagedRunpodPod["status"] = "EXITED";
+
+  constructor(pods: ManagedRunpodPod[] = []) {
+    this.pods = structuredClone(pods);
+  }
+
+  async listPods() {
+    return structuredClone(this.pods);
+  }
+
+  async getPod(id: string) {
+    return structuredClone(this.pods.find((pod) => pod.id === id) ?? null);
+  }
+
+  async createPod(input: CreateRunpodPodInput) {
+    this.createCalls += 1;
+    const pod = managedPod("PROVISIONING", {
+      name: input.name,
+      image: input.image,
+      gpuId: input.gpuId,
+      cloud: input.cloud,
+      dataCenterId: input.dataCenterId,
+    });
+    this.pods = [pod];
+    return structuredClone(pod);
+  }
+
+  async startPod(id: string) {
+    this.startCalls += 1;
+    const pod = this.pods.find((item) => item.id === id);
+    assert.ok(pod);
+    pod.status = "STARTING";
+    return structuredClone(pod);
+  }
+
+  async stopPod(id: string) {
+    this.stopCalls += 1;
+    if (this.stopFailures > 0) {
+      this.stopFailures -= 1;
+      throw new Error("simulated stop failure");
+    }
+    const pod = this.pods.find((item) => item.id === id);
+    assert.ok(pod);
+    pod.status = this.stopResultStatus;
+    return structuredClone(pod);
+  }
+}
+
+async function temporaryStore() {
+  const directory = await mkdtemp(join(tmpdir(), "voxcpm-runpod-control-"));
+  return { directory, store: new RunpodControlStore(directory) };
+}
+
+async function removeTemporary(directory: string) {
+  const root = resolve(tmpdir());
+  const target = resolve(directory);
+  assert.ok(
+    target.startsWith(root) && target.includes("voxcpm-runpod-control-"),
+  );
+  await rm(target, { recursive: true, force: true });
+}
+
+test("disabled RunPod write gateway rejects mutations before fetch", async () => {
+  let fetchCalls = 0;
+  const gateway = new RunpodRestControlGateway({
+    apiKey: config.apiKey,
+    baseUrl: "https://api.runpod.test/v2",
+    writeEnabled: false,
+    fetcher: async () => {
+      fetchCalls += 1;
+      throw new Error("fetch must not run");
+    },
+  });
+
+  await assert.rejects(
+    gateway.createPod({
+      name: "voxcpm-studio-locked",
+      image,
+      gpuId: "NVIDIA GeForce RTX 3090",
+      cloud: "secure",
+      dataCenterId: "EU-CZ-1",
+      networkVolumeId: "volume_test_001",
+      workerApiKey: config.workerApiKey,
+    }),
+    /write operations are disabled/,
+  );
+  await assert.rejects(gateway.startPod("pod-test-001"), /disabled/);
+  await assert.rejects(gateway.stopPod("pod-test-001"), /disabled/);
+  assert.equal(fetchCalls, 0);
+  assert.equal("terminatePod" in gateway, false);
+});
+
+test("enabled gateway creates a Pod with pinned image and persistent network mount", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const gateway = new RunpodRestControlGateway({
+    apiKey: config.apiKey,
+    baseUrl: "https://api.runpod.test/v2",
+    writeEnabled: true,
+    fetcher: async (input, init) => {
+      calls.push({ url: String(input), init });
+      return new Response(
+        JSON.stringify(
+          managedPod(
+            init?.body?.toString().includes('"action":"stop"')
+              ? "EXITED"
+              : "PROVISIONING",
+          ),
+        ),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    },
+  });
+
+  await gateway.createPod({
+    name: "voxcpm-studio-payload",
+    image,
+    gpuId: "NVIDIA GeForce RTX 3090",
+    cloud: "secure",
+    dataCenterId: "EU-CZ-1",
+    networkVolumeId: "volume_test_001",
+    workerApiKey: config.workerApiKey,
+  });
+  await gateway.stopPod("pod-test-001");
+
+  const createBody = JSON.parse(String(calls[0].init?.body));
+  assert.equal(calls[0].init?.method, "POST");
+  assert.equal(createBody.image, image);
+  assert.deepEqual(createBody.gpu, {
+    id: "NVIDIA GeForce RTX 3090",
+    count: 1,
+    minCudaVersion: "12.8",
+  });
+  assert.deepEqual(createBody.mounts.network, [
+    { volumeId: "volume_test_001", path: "/workspace" },
+  ]);
+  assert.equal(createBody.disk, 20);
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), { action: "stop" });
+});
+
+test("controller creates once, reconciles readiness, and verifies stop", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+      workerProbe: async () => true,
+    });
+    const input = {
+      operationId: "operation_start_0001",
+      profileId: "3090" as const,
+      durationMinutes: 60,
+      maximumHourlyRate: 0.6,
+    };
+
+    const started = await controller.start(input);
+    assert.equal(gateway.createCalls, 1);
+    assert.equal(started.session.phase, "provisioning");
+    assert.equal(started.session.hardDeadline, "2026-09-21T02:00:00.000Z");
+
+    const repeated = await controller.start(input);
+    assert.equal(repeated.session.podId, started.session.podId);
+    assert.equal(gateway.createCalls, 1);
+
+    gateway.pods[0].status = "RUNNING";
+    const ready = await controller.reconcile();
+    assert.equal(ready.session.phase, "ready");
+    assert.equal(ready.session.workerReady, true);
+
+    const stopped = await controller.stop({
+      operationId: "operation_stop_00001",
+    });
+    assert.equal(gateway.stopCalls, 1);
+    assert.equal(stopped.session.phase, "stopped");
+    assert.equal(stopped.session.stopConfirmedAt, "2026-09-21T01:00:00.000Z");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("controller resumes one exited managed Pod instead of creating another", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const gateway = new FakeGateway([managedPod("EXITED")]);
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+    });
+    const state = await controller.start({
+      operationId: "operation_resume_001",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+
+    assert.equal(gateway.createCalls, 0);
+    assert.equal(gateway.startCalls, 1);
+    assert.equal(state.session.phase, "starting");
+    assert.equal(state.session.podId, "pod-test-001");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("controller never repeats a create while its network outcome is unknown", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    class AmbiguousCreateGateway extends FakeGateway {
+      override async createPod(): Promise<ManagedRunpodPod> {
+        this.createCalls += 1;
+        throw new Error("simulated response timeout after create");
+      }
+    }
+    const gateway = new AmbiguousCreateGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+    });
+    const input = {
+      operationId: "operation_ambiguous_1",
+      profileId: "3090" as const,
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    };
+
+    await assert.rejects(controller.start(input), /response timeout/);
+    const failed = await store.read();
+    assert.equal(
+      failed.operations[0].mutationAttemptedAt,
+      "2026-09-21T01:00:00.000Z",
+    );
+    await assert.rejects(controller.start(input), /outcome is still unknown/);
+    assert.equal(gateway.createCalls, 1);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("controller enforces live rate, data center, and hard cost before mutation", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview(0.8) },
+      config: { ...config, hardCostLimitUsd: 0.2 },
+    });
+
+    await assert.rejects(
+      controller.start({
+        operationId: "operation_budget_0001",
+        profileId: "3090",
+        durationMinutes: 60,
+        maximumHourlyRate: 1,
+      }),
+      /hard cost limit/,
+    );
+    assert.equal(gateway.createCalls, 0);
+    assert.equal((await store.read()).operations.length, 0);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("watchdog retries a failed stop and closes only after verified EXITED", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => clock,
+    });
+    await controller.start({
+      operationId: "operation_watchdog_01",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    gateway.stopFailures = 1;
+    clock = new Date("2026-09-21T01:30:01.000Z");
+
+    await assert.rejects(controller.runWatchdog(), /simulated stop failure/);
+    const failed = await store.read();
+    assert.equal(failed.session.phase, "error");
+    assert.equal(failed.session.retryCount, 1);
+    assert.equal(failed.session.stopConfirmedAt, null);
+    assert.equal(failed.session.nextRetryAt, "2026-09-21T01:30:31.000Z");
+
+    const waiting = await controller.runWatchdog();
+    assert.equal(waiting.session.retryCount, 1);
+    assert.equal(gateway.stopCalls, 1);
+
+    clock = new Date("2026-09-21T01:30:32.000Z");
+    const stopped = await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 2);
+    assert.equal(stopped.session.phase, "stopped");
+    assert.equal(stopped.session.stopConfirmedAt, "2026-09-21T01:30:32.000Z");
+    assert.equal(stopped.session.retryCount, 0);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("watchdog backs off when stop is accepted but not yet verified", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    const gateway = new FakeGateway();
+    gateway.stopResultStatus = "RUNNING";
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => clock,
+    });
+    await controller.start({
+      operationId: "operation_unverified_1",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    clock = new Date("2026-09-21T01:30:01.000Z");
+
+    const pending = await controller.runWatchdog();
+    assert.equal(pending.session.phase, "stopping");
+    assert.equal(pending.session.stopConfirmedAt, null);
+    assert.equal(pending.session.retryCount, 1);
+    await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 1);
+
+    gateway.stopResultStatus = "EXITED";
+    clock = new Date("2026-09-21T01:30:32.000Z");
+    const confirmed = await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 2);
+    assert.equal(confirmed.session.phase, "stopped");
+    assert.equal(confirmed.session.stopConfirmedAt, clock.toISOString());
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("disabled controller status remains reviewable and watchdog performs no calls", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config: {
+        ...config,
+        writeEnabled: false,
+        dataCenterId: "",
+        networkVolumeId: "",
+      },
+    });
+
+    const status = await controller.status();
+    const state = await controller.runWatchdog();
+    assert.equal(status.writeEnabled, false);
+    assert.equal(status.storage.strategy, "network-volume");
+    assert.equal(status.storage.estimatedMonthlyUsd, 2.1);
+    assert.equal(status.safeguards.terminateImplemented, false);
+    assert.equal(status.safeguards.cloudWatchdogDeployed, false);
+    assert.ok(status.blockers.some((item) => item.includes("WRITE_ENABLED")));
+    assert.equal(state.session.phase, "off");
+    assert.equal(gateway.stopCalls, 0);
+  } finally {
+    await removeTemporary(directory);
+  }
+});

@@ -19,6 +19,14 @@ export const serverConfig = {
   runpodWorkerImage:
     process.env.RUNPOD_WORKER_IMAGE ||
     "ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd",
+  runpodWriteEnabled: process.env.RUNPOD_WRITE_ENABLED === "true",
+  runpodCloud: process.env.RUNPOD_CLOUD || "SECURE",
+  runpodDataCenterId: process.env.RUNPOD_DATA_CENTER_ID || "",
+  runpodNetworkVolumeId: process.env.RUNPOD_NETWORK_VOLUME_ID || "",
+  runpodHardCostLimitUsd: Number(process.env.RUNPOD_HARD_COST_LIMIT_USD || "1"),
+  runpodMaxSessionMinutes: Number(
+    process.env.RUNPOD_MAX_SESSION_MINUTES || "240",
+  ),
 };
 
 export function validateServerConfiguration(): string[] {
@@ -60,5 +68,26 @@ export function validateRunpodReadConfiguration(): string[] {
   }
   if (!/@sha256:[a-f0-9]{64}$/.test(serverConfig.runpodWorkerImage))
     errors.push("RUNPOD_WORKER_IMAGE must use an immutable sha256 digest.");
+  return errors;
+}
+
+export function validateRunpodWriteConfiguration(): string[] {
+  const errors = validateRunpodReadConfiguration();
+  if (!serverConfig.runpodWriteEnabled)
+    errors.push("RUNPOD_WRITE_ENABLED is false.");
+  if (!["SECURE", "COMMUNITY"].includes(serverConfig.runpodCloud.toUpperCase()))
+    errors.push("RUNPOD_CLOUD must be SECURE or COMMUNITY.");
+  if (!/^[A-Za-z0-9-]{2,50}$/.test(serverConfig.runpodDataCenterId))
+    errors.push("RUNPOD_DATA_CENTER_ID is not configured.");
+  if (!/^[A-Za-z0-9_-]{3,100}$/.test(serverConfig.runpodNetworkVolumeId))
+    errors.push("RUNPOD_NETWORK_VOLUME_ID is not configured.");
+  if (
+    !Number.isFinite(serverConfig.runpodHardCostLimitUsd) ||
+    serverConfig.runpodHardCostLimitUsd <= 0 ||
+    serverConfig.runpodHardCostLimitUsd > 25
+  )
+    errors.push("RUNPOD_HARD_COST_LIMIT_USD must be between 0 and 25.");
+  if (![30, 60, 120, 240].includes(serverConfig.runpodMaxSessionMinutes))
+    errors.push("RUNPOD_MAX_SESSION_MINUTES must be 30, 60, 120, or 240.");
   return errors;
 }

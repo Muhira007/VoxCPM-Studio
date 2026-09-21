@@ -204,10 +204,10 @@ test("RunPod dry-run enforces price, availability, inventory, storage, and read-
   assert.equal(plan.checks.noExistingPods, false);
   assert.equal(plan.checks.rateWithinLimit, false);
   assert.equal(plan.checks.gpuAvailable, false);
-  assert.equal(plan.checks.storageSelected, false);
+  assert.equal(plan.checks.storageSelected, true);
   assert.equal(plan.checks.writeOperationsDisabled, true);
   assert.ok(plan.blockers.some((item) => item.includes("operasi baca")));
-  assert.ok(plan.blockers.some((item) => item.includes("storage")));
+  assert.ok(plan.blockers.some((item) => item.includes("Network Volume")));
 });
 
 test("RunPod upstream errors do not expose response bodies or credentials", async () => {

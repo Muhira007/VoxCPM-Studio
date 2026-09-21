@@ -618,6 +618,80 @@ textarea::placeholder {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.runpod-guard {
+  margin: 20px 24px 0;
+  border: 1px solid #eadfc8;
+  border-radius: 9px;
+  background: #fffaf0;
+}
+.runpod-guard-heading,
+.runpod-guard-heading > div {
+  display: flex;
+  align-items: center;
+}
+.runpod-guard-heading {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 18px;
+  border-bottom: 1px solid #eee3ce;
+}
+.runpod-guard-heading > div {
+  gap: 10px;
+}
+.runpod-guard-heading svg {
+  color: #9a6e32;
+}
+.runpod-guard-heading strong,
+.runpod-guard-heading small {
+  display: block;
+}
+.runpod-guard-heading strong {
+  font-size: 13px;
+}
+.runpod-guard-heading small {
+  margin-top: 2px;
+  color: #81745f;
+  font-size: 11px;
+}
+.write-lock-badge {
+  padding: 5px 9px;
+  border: 1px solid #dfcda8;
+  border-radius: 999px;
+  color: #825b25;
+  background: #fff5df;
+  font-size: 11px;
+  font-weight: 650;
+}
+.runpod-guard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 14px 18px;
+}
+.runpod-guard-grid > div {
+  padding: 0 16px;
+  border-right: 1px solid #eee3ce;
+}
+.runpod-guard-grid > div:first-child {
+  padding-left: 0;
+}
+.runpod-guard-grid > div:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+.runpod-guard-grid span,
+.runpod-guard-grid strong,
+.runpod-guard-grid small {
+  display: block;
+}
+.runpod-guard-grid span,
+.runpod-guard-grid small {
+  color: #81745f;
+  font-size: 11px;
+}
+.runpod-guard-grid strong {
+  margin: 5px 0 3px;
+  font-size: 12px;
+}
 .runpod-plan-controls {
   display: flex;
   align-items: center;
@@ -1080,6 +1154,7 @@ textarea::placeholder {
     flex: 1;
   }
   .runpod-stats,
+  .runpod-guard-grid,
   .dry-run-details,
   .dry-run-blockers {
     grid-template-columns: 1fr;
@@ -1096,6 +1171,26 @@ textarea::placeholder {
   }
   .runpod-dry-run {
     margin-inline: 18px;
+  }
+  .runpod-guard {
+    margin-inline: 18px;
+  }
+  .runpod-guard-heading {
+    align-items: flex-start;
+  }
+  .runpod-guard-grid {
+    gap: 12px;
+  }
+  .runpod-guard-grid > div,
+  .runpod-guard-grid > div:first-child,
+  .runpod-guard-grid > div:last-child {
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid #eee3ce;
+  }
+  .runpod-guard-grid > div:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
   }
   .dry-run-summary {
     grid-template-columns: 1fr;

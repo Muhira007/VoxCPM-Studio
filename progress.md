@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4C dan integrasi baca saja Fase 5 selesai; resource GPU menunggu saldo, batas biaya final, dan strategi storage.**
-Fase aktif: **Fase 5.1 — pilih storage/data center dan siapkan pengaman operasi tulis; saldo masih $0,00 dan belum ada resource berbayar.**
+Status: **Fase 0–4C, integrasi baca saja, dan kerangka pengaman lokal Fase 5 selesai; resource GPU menunggu saldo serta volume/data center aktual.**
+Fase aktif: **Fase 5.1 — state machine sudah terkunci dan diuji dengan fake RunPod; saldo masih $0,00 dan belum ada resource berbayar.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -293,10 +293,14 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 - [x] Membaca snapshot harga aktual, ketersediaan GPU, dan katalog data center dari REST API v2.
 - [ ] Memilih kombinasi GPU, cloud, data center, dan storage; kompatibilitas image tetap harus dibuktikan pada host GPU.
-- [ ] Menentukan strategi storage; Network Volume biasa membatasi pilihan data center.
+- [x] Menentukan strategi awal Standard Network Volume 30 GB pada `/workspace`, estimasi `$2.10/bulan`; volume dan data center aktual belum dibuat.
 - [x] Menyiapkan API key hanya di environment backend, bukan browser atau variabel publik Next.js.
-- [ ] Mengintegrasikan buat/resume sesi, polling status, kesiapan model, dan akhiri sesi.
-- [ ] Membedakan stop dan terminate pada implementasi; hanya menghapus Pod setelah lokasi data persisten diverifikasi.
+- [x] Membuat gateway create/start/stop terpisah yang menolak mutation sebelum jaringan ketika `RUNPOD_WRITE_ENABLED=false`; operasi terminate tidak tersedia.
+- [x] Menyimpan state kontrol atomik, idempotency hash, lease, Pod ID, hard deadline, retry, dan waktu verifikasi pada `.data/runpod-control.json`.
+- [x] Menguji create sekali, retry idempoten, adopsi/resume Pod `EXITED`, rekonsiliasi readiness, stop, dan konflik biaya dengan fake RunPod.
+- [ ] Mengaktifkan dan memverifikasi buat/resume sesi, polling status, kesiapan model, dan akhiri sesi terhadap RunPod nyata.
+- [x] Membedakan stop dan terminate pada implementasi awal: hanya stop tersedia dan status publik menandai `terminateImplemented: false`.
+- [ ] Menambahkan terminate hanya setelah data Network Volume diverifikasi dari proses baru dan operasi hapus mendapat batas tersendiri.
 - [ ] Menguji satu siklus deploy → muat model → sintesis → simpan hasil → akhiri sesi → deploy ulang.
 - [ ] Memastikan model tidak perlu diunduh ulang tanpa alasan dan dependensi tersedia setelah Pod dibuat ulang.
 - [ ] Mengukur cold start dan menunjukkan tahap kesiapan yang sebenarnya di UI.
@@ -305,10 +309,12 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 - [ ] Menjalankan timer sebenarnya di cloud sehingga tetap bekerja ketika browser ditutup atau PC mati.
 - [ ] Mengaktifkan idle shutdown hanya ketika tidak ada pekerjaan berjalan atau antrean yang perlu diproses.
-- [ ] Menetapkan batas sesi maksimum dan perilaku pekerjaan saat tenggat mendekat agar biaya tidak diperpanjang tanpa batas.
+- [x] Mengimplementasikan deadline absolut, batas sesi maksimum 240 menit, dan hard cost limit default `$1.00` pada controller lokal.
+- [ ] Menetapkan perilaku pekerjaan aktif ketika tenggat mendekat dan membuktikannya pada worker GPU.
 - [ ] Memastikan perpanjangan waktu memperbarui tenggat di cloud.
-- [ ] Memastikan kegagalan API penghentian terdeteksi, dicoba ulang secara terbatas, dan terlihat oleh pengguna.
-- [ ] Memverifikasi status penghentian pada RunPod; timer habis saja bukan bukti tagihan GPU telah berhenti.
+- [x] Mendeteksi kegagalan API stop, menyimpan error, dan menguji maksimal tiga kegagalan dengan exponential backoff pada fake RunPod.
+- [x] Mewajibkan status `EXITED`/`TERMINATED` sebelum `stopConfirmedAt` terisi; respons stop yang belum terminal tetap masuk backoff.
+- [ ] Memverifikasi shutdown, retry, dan status penghentian pada RunPod nyata dengan pengawas cloud aktif.
 - [ ] Menampilkan estimasi biaya dengan jelas, termasuk waktu startup/idle dan biaya storage terpisah.
 
 **Kriteria selesai:** kontrol GPU bekerja nyata, data bertahan setelah sesi berakhir, dan shutdown berhasil diuji dengan browser tertutup serta PC pengguna tidak menjalankan pengawas lokal.
@@ -320,6 +326,15 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Query baca GraphQL lama dan `GET /v2/pods?limit=1` pada REST API v2 sama-sama berhasil. Akun mempunyai `0` Pod dan tidak ada mutation yang dicoba.
 - Dokumentasi resmi menyatakan GraphQL akan dihentikan pada awal 2027. Client baru harus memakai REST API v2 dengan bearer header.
 - Izin baca cukup untuk inventaris, katalog, harga, dan validasi awal. Izin tulis belum diberikan; tingkatkan hanya ketika operasi create/start/stop serta pengaman biaya selesai diimplementasikan.
+
+**Hasil kerangka pengaman tanpa saldo, 21 September 2026:**
+
+- Standard Network Volume 30 GB pada `/workspace` dipilih sebagai strategi persisten. Estimasi `$2.10/bulan`; belum ada volume yang dibuat dan belum ada biaya storage.
+- `RUNPOD_WRITE_ENABLED` default `false`; tes membuktikan create/start/stop ditolak sebelum fungsi jaringan dipanggil.
+- State machine `planned → provisioning → starting/loading_model → ready → stopping → stopped/error` menyimpan state dan lease secara atomik.
+- Rekonsiliasi Pod, operation ID, nama Pod deterministik, checkpoint mutation ambigu, batas harga/biaya, hard deadline, retry stop, dan verifikasi terminal lulus dengan fake RunPod.
+- Web UI menampilkan strategi storage, limit, feature lock, dan blocker. Tombol mutation belum ditampilkan.
+- Pengawas masih berupa controller yang harus dipanggil oleh scheduler. Deployment selalu aktif dan siklus GPU nyata belum dikerjakan.
 
 ## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
@@ -387,11 +402,12 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Fase 4C selesai: image GPU diterbitkan sebagai paket GHCR publik dengan tag commit yang dilindungi dari overwrite dan digest tetap.                                                                                           | Run 35571278859 lulus; manifest tag dan digest dapat diambil anonim dengan HTTP 200, paket tertaut ke repository, dan regresi container simulasi lulus pada run 35570024814.                                         | Image belum diuji pada GPU dan saldo RunPod masih $0,00. Rekomendasi berikutnya adalah membuat API key RunPod Restricted setelah verifikasi dua langkah, menyimpannya hanya di `.env.local`, lalu membangun client kontrol cloud dengan mode dry-run tanpa membuat Pod.            |
 | 21 September 2026 | Persiapan kredensial Fase 5 selesai: API key `Restricted` baca saja dibuat dan disimpan hanya di `.env.local`.                                                                                                                | GraphQL read-only dan REST API v2 `GET /pods` berhasil, menghasilkan 0 Pod; Git mengabaikan `.env.local`, tidak ada mutation atau resource berbayar.                                                                 | Rekomendasi berikutnya adalah client REST API v2 untuk inventaris Pod, katalog GPU/data center, harga, dan dry-run. Izin tulis tetap dinonaktifkan sampai pengaman biaya selesai.                                                                                                  |
 | 21 September 2026 | Fase 5.0 selesai: client REST API v2 GET-only, endpoint terautentikasi, cache snapshot, planner dry-run, dan panel RunPod di Sesi GPU tersedia. Race condition inisialisasi storage pada request API paralel juga diperbaiki. | 27/27 tes Node, TypeScript, ESLint, build produksi, endpoint nyata, serta UI desktop/ponsel lulus; [Application checks run 35603569305](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35603569305) sukses. Akun tetap 0 Pod; dry-run Secure RTX 4090 `$0.74` menghasilkan `resourceCreated: false` dan blocker storage/izin. | Saldo masih $0,00, storage belum dipilih, key tetap baca saja, dan ketersediaan GPU berubah antar-snapshot. Rekomendasi berikutnya adalah memilih storage/data center dan merancang operasi create/stop idempotent di balik feature flag tanpa menaikkan izin key terlebih dahulu. |
+| 21 September 2026 | Fase 5.1A selesai tanpa saldo: strategi Standard Network Volume 30 GB dipilih; gateway dan state machine create/resume/stop dibuat di balik feature flag nonaktif. | 36/36 tes Node membuktikan lock sebelum jaringan, payload mount, idempotency, timeout create ambigu, lease persisten, rekonsiliasi, batas biaya, deadline, backoff, dan stop terminal. TypeScript, ESLint, dan build produksi lulus; akun tetap 0 Pod dan tidak ada mutation nyata. | Volume/data center aktual, izin tulis, scheduler cloud, dan siklus GPU tetap menunggu. Rekomendasi berikutnya tanpa saldo adalah mengemas watchdog sebagai command scheduler-ready serta menetapkan single-writer deployment atau datastore dengan compare-and-swap; saldo diperlukan saat membuat Network Volume atau Pod pertama. |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** tentukan storage persisten dan data center dari katalog yang sudah tersedia, lalu implementasikan state machine create/resume/stop sebagai kode yang tetap terkunci di balik feature flag. Tambahkan idempotency/lease, rekonsiliasi Pod yang sudah ada, hard deadline, batas biaya, dan verifikasi status stop sebelum meminta perubahan izin key.
+**Rekomendasi selama saldo RunPod masih $0,00:** kemas `runWatchdog()` sebagai command yang dapat dipanggil scheduler, lalu pilih deployment single-writer atau datastore dengan compare-and-swap agar lease aman pada lebih dari satu proses. Dokumentasikan dan uji pengawas yang selalu aktif dengan fake RunPod. Pekerjaan ini tidak membutuhkan perubahan key atau resource berbayar.
 
-Sesudah saldo tersedia, baca ulang harga dan ketersediaan aktual, konfirmasi batas harga serta durasi uji, lalu naikkan izin key hanya untuk operasi yang sudah terlindungi. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
+Sesudah saldo tersedia, buat Network Volume 30 GB pada data center yang mendukung GPU terpilih, baca ulang harga dan ketersediaan, konfirmasi batas `$1.00` serta durasi uji, lalu naikkan izin key hanya untuk create/start/stop. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.
