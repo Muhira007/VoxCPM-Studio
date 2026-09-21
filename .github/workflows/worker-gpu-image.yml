@@ -93,6 +93,12 @@ jobs:
           image_ref="${image}:${tag}"
 
           echo "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+
+          if docker manifest inspect "${image_ref}" > /dev/null 2>&1; then
+            echo "Refusing to overwrite existing immutable tag: ${image_ref}" >&2
+            exit 1
+          fi
+
           docker tag voxcpm-worker:gpu "${image_ref}"
 
           push_output="$(docker push "${image_ref}" 2>&1 | tee /dev/stderr)"
