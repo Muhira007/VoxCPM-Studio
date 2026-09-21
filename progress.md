@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4B selesai; Fase 5 menunggu saldo RunPod, batas biaya, dan strategi storage.**
-Fase aktif: **Persiapan Fase 5 — paket VoxCPM2/CUDA telah lolos build tanpa GPU; saldo masih $0,00 dan belum ada resource berbayar.**
+Status: **Fase 0–4C selesai; kredensial baca Fase 5 siap, sedangkan resource GPU menunggu saldo, batas biaya, dan strategi storage.**
+Fase aktif: **Persiapan Fase 5 — image GPU immutable serta API key `Restricted` baca saja sudah diverifikasi; saldo masih $0,00 dan belum ada resource berbayar.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -278,7 +278,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 - [ ] Memeriksa harga aktual, ketersediaan GPU, data center, storage, dan kompatibilitas image.
 - [ ] Menentukan strategi storage; Network Volume biasa membatasi pilihan data center.
-- [ ] Menyiapkan API key hanya di environment backend, bukan browser atau variabel publik Next.js.
+- [x] Menyiapkan API key hanya di environment backend, bukan browser atau variabel publik Next.js.
 - [ ] Mengintegrasikan buat/resume sesi, polling status, kesiapan model, dan akhiri sesi.
 - [ ] Membedakan stop dan terminate pada implementasi; hanya menghapus Pod setelah lokasi data persisten diverifikasi.
 - [ ] Menguji satu siklus deploy → muat model → sintesis → simpan hasil → akhiri sesi → deploy ulang.
@@ -296,6 +296,14 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [ ] Menampilkan estimasi biaya dengan jelas, termasuk waktu startup/idle dan biaya storage terpisah.
 
 **Kriteria selesai:** kontrol GPU bekerja nyata, data bertahan setelah sesi berakhir, dan shutdown berhasil diuji dengan browser tertutup serta PC pengguna tidak menjalankan pengawas lokal.
+
+**Hasil persiapan kredensial, 21 September 2026:**
+
+- API key `voxcpm-studio-readonly` dibuat sebagai `Restricted`: GraphQL `Read only` dan `api.runpod.ai` `None`.
+- Key disimpan pada `.env.local`; `git check-ignore` membuktikan berkas tersebut diabaikan dan key tidak masuk repository.
+- Query baca GraphQL lama dan `GET /v2/pods?limit=1` pada REST API v2 sama-sama berhasil. Akun mempunyai `0` Pod dan tidak ada mutation yang dicoba.
+- Dokumentasi resmi menyatakan GraphQL akan dihentikan pada awal 2027. Client baru harus memakai REST API v2 dengan bearer header.
+- Izin baca cukup untuk inventaris, katalog, harga, dan validasi awal. Izin tulis belum diberikan; tingkatkan hanya ketika operasi create/start/stop serta pengaman biaya selesai diimplementasikan.
 
 ## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
@@ -361,10 +369,11 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus; CI publik tercatat pada run 35566625556. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
 | 21 September 2026 | Fase 4B selesai: adapter VoxCPM2, transfer referensi/hasil, preflight CUDA, dependency pin, serta image GPU RunPod disiapkan tanpa Pod. | 7/7 tes worker, 22/22 tes Node, build aplikasi dan container simulasi lulus; image GPU dibangun dari nol dan package/fail-closed startup diverifikasi pada run 35568741429. | Image belum diterbitkan ke registry dan belum diuji pada GPU. Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah publikasi image immutable ke registry tanpa membuat Pod. |
 | 21 September 2026 | Fase 4C selesai: image GPU diterbitkan sebagai paket GHCR publik dengan tag commit yang dilindungi dari overwrite dan digest tetap. | Run 35571278859 lulus; manifest tag dan digest dapat diambil anonim dengan HTTP 200, paket tertaut ke repository, dan regresi container simulasi lulus pada run 35570024814. | Image belum diuji pada GPU dan saldo RunPod masih $0,00. Rekomendasi berikutnya adalah membuat API key RunPod Restricted setelah verifikasi dua langkah, menyimpannya hanya di `.env.local`, lalu membangun client kontrol cloud dengan mode dry-run tanpa membuat Pod. |
+| 21 September 2026 | Persiapan kredensial Fase 5 selesai: API key `Restricted` baca saja dibuat dan disimpan hanya di `.env.local`. | GraphQL read-only dan REST API v2 `GET /pods` berhasil, menghasilkan 0 Pod; Git mengabaikan `.env.local`, tidak ada mutation atau resource berbayar. | Rekomendasi berikutnya adalah client REST API v2 untuk inventaris Pod, katalog GPU/data center, harga, dan dry-run. Izin tulis tetap dinonaktifkan sampai pengaman biaya selesai. |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** selesaikan verifikasi dua langkah RunPod, buat API key `Restricted` khusus proyek dengan izin minimum, dan simpan hanya pada `.env.local` yang diabaikan Git. Setelah itu, implementasikan client kontrol RunPod beserta validasi konfigurasi, pembacaan inventaris, dan mode dry-run tanpa membuat Pod.
+**Rekomendasi selama saldo RunPod masih $0,00:** implementasikan client REST API v2 server-side untuk validasi konfigurasi, pembacaan inventaris Pod, katalog GPU/data center, informasi harga, dan mode dry-run tanpa membuat Pod. Pertahankan key `Read only` sampai operasi tulis, idempotensi, batas biaya, dan verifikasi shutdown selesai diuji lokal.
 
 Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 

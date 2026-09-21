@@ -1,6 +1,8 @@
 # Rancangan kontrol RunPod dan shutdown
 
-Dokumen ini adalah rancangan Fase 4. Tidak ada Pod, volume, API key, atau biaya RunPod yang dibuat.
+Dokumen ini berawal sebagai rancangan Fase 4 dan diperbarui pada persiapan Fase 5. Satu API key `Restricted` khusus proyek sudah dibuat dengan GraphQL `Read only` dan `api.runpod.ai` `None`, disimpan hanya pada `.env.local`, lalu diverifikasi melalui query baca REST API v2. Tidak ada Pod, volume, mutation, atau biaya RunPod yang dibuat.
+
+Integrasi baru harus memakai REST API v2 di `https://api.runpod.io/v2` dengan header `Authorization: Bearer <key>`. GraphQL hanya dipakai sekali untuk verifikasi kompatibilitas key dan tidak menjadi dasar implementasi karena dokumentasi RunPod menyatakan GraphQL akan dihentikan pada awal 2027. Naikkan izin key ke tulis hanya ketika operasi create/start/stop sudah mempunyai validasi biaya, idempotensi, dan verifikasi status.
 
 ## Kepemilikan state
 
@@ -60,7 +62,7 @@ Worker saat ini menolak startup jika direktori data/model/cache/referensi/output
 
 ## Keamanan dan observabilitas
 
-- API key RunPod hanya berada di control plane backend.
+- API key RunPod hanya berada di control plane backend. Konfigurasi lokal memakai `.env.local`, yang diabaikan Git; nama variabel tidak boleh diawali `NEXT_PUBLIC_`.
 - Worker memakai kunci berbeda, jaringan terbatas, dan TLS/reverse proxy pada deployment.
 - Log menyertakan operation ID, session ID, job ID, transisi status, latency, dan hasil stop tanpa mencatat kunci, teks sensitif, atau isi audio.
 - Endpoint pengelolaan sesi memerlukan autentikasi pengguna; CORS tidak dipakai sebagai autentikasi.
