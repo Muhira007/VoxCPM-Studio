@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { serverConfig } from "./config.ts";
 import type { ApiSession, PersistedAppState, ServerJob, ServerVoice } from "./contracts";
 
@@ -97,6 +97,33 @@ export class AppStore {
     const destination = resolve(this.referencesDir, storageName);
     if (!destination.startsWith(`${resolve(this.referencesDir)}\\`) && !destination.startsWith(`${resolve(this.referencesDir)}/`)) throw new Error("Reference path escaped its storage directory.");
     return destination;
+  }
+
+  outputPath(storageName: string): string {
+    if (!/^job_[A-Za-z0-9_-]{8,100}\.wav$/.test(storageName)) throw new Error("Invalid output storage name.");
+    const destination = resolve(this.outputsDir, storageName);
+    const relation = relative(resolve(this.outputsDir), destination);
+    if (!relation || relation.startsWith("..") || isAbsolute(relation)) throw new Error("Output path escaped its storage directory.");
+    return destination;
+  }
+
+  async saveOutput(jobId: string, audio: Uint8Array): Promise<string> {
+    await this.initialize();
+    const storageName = `${jobId}.wav`;
+    const destination = this.outputPath(storageName);
+    try {
+      await writeFile(destination, audio, { flag: "wx" });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+    return storageName;
+  }
+
+  async clearOutputs(): Promise<void> {
+    const relation = relative(resolve(this.dataDir), resolve(this.outputsDir));
+    if (!relation || relation.startsWith("..") || isAbsolute(relation)) throw new Error("Output directory escaped application storage.");
+    await rm(this.outputsDir, { recursive: true, force: true });
+    await mkdir(this.outputsDir, { recursive: true });
   }
 
   async removeReference(voice: ServerVoice): Promise<void> {

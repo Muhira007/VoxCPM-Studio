@@ -88,7 +88,7 @@ function mapJob(job: ApiJob): SynthesisJob {
     status: job.status,
     progress: job.progress,
     message: job.message,
-    audioUrl: null,
+    audioUrl: job.outputFile ? `/api/v1/jobs/${encodeURIComponent(job.id)}/audio` : null,
     audioDuration: job.audioDuration,
   };
 }

@@ -3,7 +3,7 @@ import { ApiError, errorResponse, requireStudioAccess } from "@/server/http";
 import { enforceSessionDeadline, publicJob } from "@/server/services";
 import { appStore } from "@/server/store";
 import { validId } from "@/server/validation";
-import { readWorkerJob } from "@/server/worker-client";
+import { downloadWorkerAudio, readWorkerJob } from "@/server/worker-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!job) throw new ApiError(404, "Job not found.");
     if (job.status === "queued" || job.status === "running") {
       const worker = await readWorkerJob(id);
-      job = await appStore.updateJob(id, { status: worker.status, progress: worker.progress, message: worker.message || job.message, updatedAt: new Date().toISOString(), outputFile: null, audioDuration: null }) ?? job;
+      const outputFile = worker.status === "succeeded" && worker.output_path
+        ? await appStore.saveOutput(id, await downloadWorkerAudio(id))
+        : null;
+      job = await appStore.updateJob(id, {
+        status: worker.status,
+        progress: worker.progress,
+        message: worker.message || job.message,
+        updatedAt: new Date().toISOString(),
+        outputFile,
+        audioDuration: worker.audio_duration,
+      }) ?? job;
     }
     return NextResponse.json({ job: publicJob(job) });
   } catch (error) { return errorResponse(error); }

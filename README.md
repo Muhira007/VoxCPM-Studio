@@ -1,6 +1,6 @@
 # VoxCPM Studio
 
-Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, worker simulasi, dan image container telah diverifikasi. Belum terhubung ke VoxCPM2 atau RunPod dan belum menghasilkan audio AI.**
+Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, worker simulasi, dan container simulasi telah diverifikasi. Paket worker VoxCPM2/CUDA sudah disiapkan, tetapi belum dijalankan pada GPU dan belum menghasilkan audio AI yang terverifikasi.**
 
 ## Menjalankan aplikasi
 
@@ -69,7 +69,7 @@ npm test
 npm run build
 ```
 
-Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, dan kegagalan simulasi.
+Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, dan kegagalan simulasi.
 
 Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Image Docker juga berhasil dibangun dan diuji pada [GitHub Actions](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742), termasuk health check dan persistensi setelah restart.
 
@@ -88,14 +88,15 @@ src/lib/fixtures.ts       Naskah, inspirasi, profil GPU, dan label demo
 src/lib/webmcp.ts         Peningkatan opsional untuk browser yang mendukung WebMCP
 src/server/               Persistensi, validasi, autentikasi, dan client worker
 src/app/api/v1/           Route Handler API aplikasi
-worker/app/               Worker FastAPI mode simulasi
+worker/app/               Worker FastAPI mode simulasi dan adapter VoxCPM2
+worker/Dockerfile.gpu     Image GPU RunPod dengan versi model/dependensi terkunci
 worker/tests/             Pengujian kontrak worker
-docs/                     API lokal dan rancangan kontrol RunPod
+docs/                     API lokal, paket GPU, dan rancangan kontrol RunPod
 tests/                    Pengujian frontend dan backend Node
 .github/workflows/        Validasi otomatis image dan kontrak container
 ```
 
-Halaman memakai kontrak `StudioService` melalui provider. Provider memilih adapter demo atau API berdasarkan konfigurasi publik non-rahasia; mode API memakai sesi `HttpOnly` dan tidak mengirim `STUDIO_API_KEY` ke browser. Gunakan [progress.md](progress.md) sebagai urutan pekerjaan dan catatan keputusan; rancangan shutdown cloud ada di [docs/runpod-worker-design.md](docs/runpod-worker-design.md).
+Halaman memakai kontrak `StudioService` melalui provider. Provider memilih adapter demo atau API berdasarkan konfigurasi publik non-rahasia; mode API memakai sesi `HttpOnly` dan tidak mengirim `STUDIO_API_KEY` ke browser. Gunakan [progress.md](progress.md) sebagai urutan pekerjaan dan catatan keputusan; paket image ada di [docs/gpu-worker-package.md](docs/gpu-worker-package.md), sedangkan rancangan shutdown cloud ada di [docs/runpod-worker-design.md](docs/runpod-worker-design.md).
 
 WebMCP dideteksi secara opsional melalui `document.modelContext`. Jika tersedia, dua alat membaca status demo dan mengganti draft memakai state yang sama dengan UI. Pendaftaran dibersihkan dengan `AbortSignal`; browser tanpa dukungan tetap dapat memakai seluruh UI. Verifikasi dalam konteks WebMCP yang mendukung belum dilakukan; fitur ini bukan prasyarat demo lokal.
 

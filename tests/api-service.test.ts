@@ -164,7 +164,9 @@ test("API adapter polls active job details until the worker result is terminal",
           ...queued,
           status: "succeeded",
           progress: 100,
-          message: "Simulation completed. No audio was created.",
+          message: "VoxCPM2 generation completed.",
+          outputFile: "job_polling_001.wav",
+          audioDuration: 1.25,
         },
       });
     if (path === "/api/v1/voices") return json({ voices: [] });
@@ -186,6 +188,8 @@ test("API adapter polls active job details until the worker result is terminal",
   await new Promise<void>((resolve) => setImmediate(resolve));
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(service.getSnapshot().jobs[0].status, "succeeded");
+  assert.equal(service.getSnapshot().jobs[0].audioUrl, "/api/v1/jobs/job_polling_001/audio");
+  assert.equal(service.getSnapshot().jobs[0].audioDuration, 1.25);
 });
 
 test("API adapter returns to login when the server session expires", async () => {

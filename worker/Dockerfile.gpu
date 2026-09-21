@@ -1,0 +1,46 @@
+ARG RUNPOD_BASE_IMAGE=runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
+FROM ${RUNPOD_BASE_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    WORKER_MODE=voxcpm2 \
+    WORKER_DATA_DIR=/workspace/worker \
+    WORKER_MODEL_DIR=/workspace/models \
+    WORKER_CACHE_DIR=/workspace/cache \
+    WORKER_REFERENCES_DIR=/workspace/references \
+    WORKER_OUTPUTS_DIR=/workspace/outputs \
+    WORKER_MODEL_ID=openbmb/VoxCPM2 \
+    WORKER_MODEL_REVISION=32279effe8c19989596f05d353d1447f51d9e915 \
+    WORKER_MODEL_LOCAL_ONLY=false \
+    WORKER_MODEL_OPTIMIZE=true \
+    WORKER_MINIMUM_VRAM_GB=8 \
+    HF_HOME=/workspace/cache/huggingface \
+    TORCHINDUCTOR_CACHE_DIR=/workspace/cache/torchinductor
+
+WORKDIR /app
+
+RUN apt-get update --yes \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+      ffmpeg \
+      gosu \
+      libsndfile1 \
+      tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 worker \
+    && useradd --uid 10001 --gid worker --create-home worker
+
+COPY requirements.txt requirements-gpu.txt ./
+RUN python -m pip install --no-cache-dir --requirement requirements.txt \
+    && python -m pip install --no-cache-dir --requirement requirements-gpu.txt \
+    && python -m pip check
+
+COPY app ./app
+COPY start.py start_gpu.py preflight_gpu.py gpu-entrypoint.sh ./
+RUN chmod 0755 /app/gpu-entrypoint.sh \
+    && chown -R worker:worker /app \
+    && python preflight_gpu.py --build
+
+EXPOSE 8001
+HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=4 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2).read()"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/gpu-entrypoint.sh"]
+CMD ["python", "start_gpu.py"]

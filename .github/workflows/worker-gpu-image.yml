@@ -1,0 +1,75 @@
+name: GPU worker image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/worker-gpu-image.yml"
+      - "worker/Dockerfile.gpu"
+      - "worker/gpu-entrypoint.sh"
+      - "worker/preflight_gpu.py"
+      - "worker/requirements-gpu.txt"
+      - "worker/requirements.txt"
+      - "worker/start_gpu.py"
+      - "worker/app/**"
+  pull_request:
+    paths:
+      - ".github/workflows/worker-gpu-image.yml"
+      - "worker/Dockerfile.gpu"
+      - "worker/gpu-entrypoint.sh"
+      - "worker/preflight_gpu.py"
+      - "worker/requirements-gpu.txt"
+      - "worker/requirements.txt"
+      - "worker/start_gpu.py"
+      - "worker/app/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-gpu-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build GPU package without a GPU
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          docker system prune --all --force
+          df -h /
+
+      - name: Build pinned GPU worker image
+        run: docker build --file worker/Dockerfile.gpu --tag voxcpm-worker:gpu worker
+
+      - name: Validate packages and fail-closed startup
+        shell: bash
+        env:
+          WORKER_API_KEY: worker-ci-key-with-at-least-32-characters
+        run: |
+          set -euo pipefail
+
+          docker run --rm --entrypoint python voxcpm-worker:gpu preflight_gpu.py --build
+          test "$(docker run --rm voxcpm-worker:gpu id -u)" = "10001"
+
+          set +e
+          docker run --rm --env WORKER_API_KEY voxcpm-worker:gpu > /tmp/gpu-startup.log 2>&1
+          exit_code=$?
+          set -e
+          test "${exit_code}" -ne 0
+          grep --fixed-strings "CUDA is unavailable" /tmp/gpu-startup.log
+
+      - name: Inspect reproducibility settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_env="$(docker image inspect voxcpm-worker:gpu --format '{{json .Config.Env}}')"
+          grep --fixed-strings 'WORKER_MODE=voxcpm2' <<< "${image_env}"
+          grep --fixed-strings 'WORKER_MODEL_REVISION=32279effe8c19989596f05d353d1447f51d9e915' <<< "${image_env}"

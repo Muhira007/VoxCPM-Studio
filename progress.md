@@ -1,14 +1,14 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4 dan Fase 4A selesai; Fase 5 menunggu saldo RunPod dan batas biaya.**
-Fase aktif: **Persiapan Fase 5 — akun RunPod dapat diakses, tetapi saldo masih $0,00 sehingga belum ada resource berbayar yang dibuat.**
+Status: **Fase 0–4A selesai; implementasi Fase 4B selesai lokal dan menunggu validasi build image GPU di CI.**
+Fase aktif: **Fase 4B — paket VoxCPM2/CUDA disiapkan tanpa membuat resource RunPod; saldo masih $0,00.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
 Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice design menggunakan VoxCPM2 dengan GPU RunPod yang dinyalakan sesuai kebutuhan. Nama kerja aplikasi: **VoxCPM Studio**.
 
-**Pekerjaan lokal tanpa biaya telah diprioritaskan; frontend, backend, container, autentikasi Web UI, dan adapter API sudah selesai. Pengguna belum mempunyai saldo RunPod.** Fase 5 tidak boleh membuat resource berbayar sampai saldo, batas harga, durasi uji, dan strategi storage siap.
+**Pekerjaan lokal tanpa biaya telah diprioritaskan; frontend, backend, container simulasi, autentikasi Web UI, adapter API, dan implementasi paket GPU sudah selesai. Pengguna belum mempunyai saldo RunPod.** Fase 5 tidak boleh membuat resource berbayar sampai saldo, batas harga, durasi uji, dan strategi storage siap.
 
 - Frontend: Next.js, React, TypeScript, Tailwind CSS; gunakan shadcn/ui bila sesuai kebutuhan komponen.
 - Antarmuka berbahasa Indonesia; fokus pada penggunaan desktop, tetap nyaman di layar kecil.
@@ -206,13 +206,42 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [GitHub Actions run 35566625556](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35566625556) lulus pada runner Ubuntu dengan Node.js 24: instalasi bersih, 22/22 pengujian Node, pemeriksaan TypeScript, ESLint, dan build produksi.
 - Data integrasi direset, dua proses pengujian dihentikan, dan `.env.local` berisi rahasia uji dihapus setelah pemeriksaan.
 
-**Batas saat ini:** autentikasi ini ditujukan untuk aplikasi pribadi satu pengguna. Sesi bersifat stateless; mengganti `STUDIO_SESSION_SECRET` membatalkan cookie lama. Worker tetap mode simulasi dan belum memuat VoxCPM2/CUDA.
+**Batas pada akhir Fase 4A:** autentikasi ini ditujukan untuk aplikasi pribadi satu pengguna. Sesi bersifat stateless; mengganti `STUDIO_SESSION_SECRET` membatalkan cookie lama. Worker masih mode simulasi; paket VoxCPM2/CUDA kemudian disiapkan pada Fase 4B.
 
 **Kriteria selesai:** pengguna dapat masuk melalui Web UI, memakai seluruh alur API lokal tanpa melihat kunci server, memantau pekerjaan sampai terminal, lalu keluar. Alur ini telah lulus melalui browser dan pengujian otomatis.
 
 **Status fase:** selesai.
 
-## 9. Fase 5 — Integrasi RunPod setelah saldo tersedia
+## 9. Fase 4B — Paket worker GPU tanpa membuat Pod
+
+- [x] Memeriksa ulang repository, dokumentasi, rilis PyPI, dan model card resmi VoxCPM2.
+- [x] Memilih VoxCPM `2.0.3`, snapshot model commit `32279effe8c19989596f05d353d1447f51d9e915`, serta base RunPod PyTorch/CUDA berversi.
+- [x] Mengunci pasangan PyTorch `2.8.0`, TorchAudio `2.8.0`, TorchCodec `0.7.0`, dan dependensi langsung VoxCPM dari lock rilis upstream.
+- [x] Menambahkan `WORKER_MODE=voxcpm2` dengan preflight package, CUDA, versi, dan batas minimum VRAM.
+- [x] Memuat model di latar belakang dengan readiness `loading`, `ready`, atau `error`, terpisah dari liveness.
+- [x] Memetakan TTS, Voice Design, controllable cloning, dan Hi-Fi cloning ke API Python VoxCPM2 `2.0.3`.
+- [x] Menyimpan WAV secara atomik, membuang hasil pekerjaan yang dibatalkan, serta menjaga satu eksekusi GPU pada satu waktu.
+- [x] Mengunggah referensi dari backend ke worker dan mengunduh hasil audio worker kembali ke storage aplikasi tanpa membuka kunci worker ke browser.
+- [x] Menyediakan endpoint audio hasil terautentikasi pada worker dan API aplikasi.
+- [x] Membuat `worker/Dockerfile.gpu`, startup UID `10001`, mount `/workspace`, health check, dan dokumentasi template RunPod.
+- [x] Menguji kontrak baru tanpa GPU memakai fake runtime serta seluruh regresi simulasi/frontend/backend.
+- [ ] Membangun image GPU dari nol pada GitHub Actions dan memverifikasi package serta startup fail-closed tanpa CUDA. Menunggu push dan hasil workflow.
+
+**Hasil verifikasi lokal Fase 4B, 21 September 2026:**
+
+- Sumber resmi menyatakan VoxCPM2 mendukung Bahasa Indonesia, output 48 kHz, Python 3.10–3.12, PyTorch minimal 2.5, CUDA minimal 12, serta sekitar 8 GB VRAM; pilihan uji pertama tetap GPU 24 GB untuk ruang runtime.
+- Backend tidak lagi mengirim path Windows ke worker jarak jauh. Referensi diunggah dengan ID aman dan batas 20 MB; output worker dibatasi 100 MB sebelum disimpan oleh aplikasi.
+- Pemetaan empat mode dan penulisan WAV diuji tanpa mengimpor model nyata. Hasil ini memvalidasi adapter, bukan inferensi GPU atau kualitas suara.
+- 7/7 pengujian worker dan 22/22 pengujian Node lulus. TypeScript dan ESLint lulus.
+- Rancangan dan konfigurasi terdapat di `docs/gpu-worker-package.md`. Tidak ada Pod, volume, API key RunPod, atau biaya cloud yang dibuat.
+
+**Batas saat ini:** image belum selesai dibangun di CI dan belum dijalankan dengan NVIDIA GPU. Bobot model belum diunduh, WAV AI belum dihasilkan, sample rate belum diperiksa dari berkas nyata, dan kebutuhan VRAM/cold start belum diukur.
+
+**Kriteria selesai:** image GPU dapat dibangun reproducibly tanpa GPU, versi inti terverifikasi, startup tanpa CUDA gagal jelas, dan kontrak transfer referensi/hasil lolos. Inferensi tetap menunggu Fase 5.
+
+**Status fase:** implementasi lokal selesai; validasi container CI masih terbuka.
+
+## 10. Fase 5 — Integrasi RunPod setelah saldo tersedia
 
 **Prasyarat:** saldo tersedia, konfigurasi akun siap, serta batas harga dan durasi pengujian ditetapkan bersama pengguna. Pemeriksaan read-only pada 21 September 2026 menunjukkan saldo `$0,00` dan pemakaian `$0/jam`; belum ada resource berbayar yang dibuat.
 
@@ -239,7 +268,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** kontrol GPU bekerja nyata, data bertahan setelah sesi berakhir, dan shutdown berhasil diuji dengan browser tertutup serta PC pengguna tidak menjalankan pengawas lokal.
 
-## 10. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
+## 11. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
 - [ ] Menguji TTS Indonesia, voice design, cloning dengan gaya, dan Hi-Fi cloning secara terpisah.
@@ -257,7 +286,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** pengguna dapat menghasilkan dan mengunduh audio nyata, mengulang bagian yang bermasalah, serta mengakhiri sesi GPU dengan hasil tersimpan. Kualitas dan biaya dilaporkan dari pengukuran.
 
-## 11. Pengembangan lanjutan — di luar syarat selesai MVP
+## 12. Pengembangan lanjutan — di luar syarat selesai MVP
 
 - [ ] Editor dialog multi-speaker dengan suara dan gaya per segmen.
 - [ ] Perbandingan beberapa kandidat hasil audio.
@@ -267,7 +296,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [ ] Evaluasi vLLM-Omni atau engine lain jika antrean dan kebutuhan throughput membenarkannya.
 - [ ] Migrasi ke Serverless atau multi-user jika pola penggunaan sudah membutuhkan.
 
-## 12. Catatan teknis yang harus dipertahankan
+## 13. Catatan teknis yang harus dipertahankan
 
 1. **Frontend dahulu:** mode demo tidak membuat resource, tidak mengonsumsi saldo, dan tidak mengklaim menghasilkan suara AI nyata.
 2. **Persistensi:** folder source di `/workspace` tidak otomatis membuat seluruh environment Python persisten. Dependensi harus tersedia dalam image atau environment yang sengaja dikelola.
@@ -290,7 +319,7 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 - [Custom template RunPod](https://docs.runpod.io/pods/templates/create-custom-template)
 - [Harga RunPod](https://www.runpod.io/pricing)
 
-## 13. Log progres
+## 14. Log progres
 
 | Tanggal | Hasil | Verifikasi | Kendala / langkah berikutnya |
 | --- | --- | --- | --- |
@@ -302,9 +331,9 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Fase 4 selesai melalui validasi container di GitHub Actions tanpa memakai RunPod. | Image berhasil dibangun; container non-root, autentikasi, simulasi, restart/persistensi, dan Docker health check lulus pada run 35540568742. | Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah autentikasi sesi `HttpOnly` dan adapter API Web UI secara lokal sambil menunggu prasyarat Fase 5. |
 | 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus; CI publik tercatat pada run 35566625556. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
 
-## 14. Langkah pengerjaan berikutnya
+## 15. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** siapkan paket deployment GPU tanpa membuat Pod: verifikasi API VoxCPM2 upstream terbaru, tentukan base image CUDA/PyTorch dan dependensi terkunci, serta tambahkan pemeriksaan startup yang gagal dengan jelas bila model atau GPU belum siap. Kode inferensi belum boleh diklaim berfungsi sebelum dijalankan pada GPU.
+**Langkah langsung:** selesaikan Fase 4B dengan build image GPU di GitHub Actions. Build hanya memeriksa base image, resolver package, import VoxCPM, UID, revision model, dan kegagalan startup tanpa CUDA; build tidak mengunduh bobot model dan tidak memakai RunPod.
 
 Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 

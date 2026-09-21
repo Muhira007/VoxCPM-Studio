@@ -62,6 +62,14 @@ class WorkerJob(BaseModel):
 
 class Readiness(BaseModel):
     ready: bool
-    mode: Literal["simulation"]
-    model_state: Literal["ready", "error"]
+    mode: Literal["simulation", "voxcpm2"]
+    model_state: Literal["loading", "ready", "error"]
     message: str
+    model_id: str | None = None
+    device: str | None = None
+
+
+class ReferenceUpload(BaseModel):
+    id: str
+    path: str
+    size: int = Field(gt=0)

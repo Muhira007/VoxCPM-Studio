@@ -13,6 +13,7 @@ export async function DELETE(request: Request) {
     await stopSession("Local worker session stopped during data reset.");
     const voices = (await appStore.read()).voices;
     await Promise.all(voices.map((voice) => appStore.removeReference(voice)));
+    await appStore.clearOutputs();
     await appStore.mutate((state) => {
       state.jobs = [];
       state.voices = [];

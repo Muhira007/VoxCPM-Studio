@@ -87,6 +87,22 @@ class WorkerStore:
             self._persist()
             return job.model_copy(deep=True)
 
+    def complete(self, job_id: str, *, output_path: str, audio_duration: float, message: str) -> WorkerJob | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return None
+            if job.status == JobStatus.CANCELLED:
+                return job.model_copy(deep=True)
+            job.status = JobStatus.SUCCEEDED
+            job.progress = 100
+            job.output_path = output_path
+            job.audio_duration = audio_duration
+            job.message = message
+            job.updated_at = utc_now()
+            self._persist()
+            return job.model_copy(deep=True)
+
     def cancel(self, job_id: str) -> WorkerJob | None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -94,7 +110,7 @@ class WorkerStore:
                 return None
             if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
                 job.status = JobStatus.CANCELLED
-                job.message = "Simulation job cancelled. No audio was created."
+                job.message = "Cancellation accepted. Any in-flight generation will discard its output."
                 job.updated_at = utc_now()
                 self._persist()
             return job.model_copy(deep=True)

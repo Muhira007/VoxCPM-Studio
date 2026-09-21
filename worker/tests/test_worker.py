@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 
 from worker.app import main
 from worker.app.config import Settings
+from worker.app.inference import VoxCPMRuntime, generation_arguments
+from worker.app.models import SynthesisRequest
 
 API_KEY = "worker-test-key-with-at-least-32-characters"
 HEADERS = {"X-Worker-Key": API_KEY}
@@ -98,3 +100,84 @@ def test_failure_and_validation_paths(client):
     reference.write_bytes(b"RIFF-test")
     valid_clone = test_client.post("/v1/jobs", headers=HEADERS, json=payload("job-clone-002", mode="clone", reference_path=str(reference)))
     assert valid_clone.status_code == 202
+
+
+def test_reference_upload_and_authenticated_audio_download(client):
+    test_client, references = client
+    uploaded = test_client.put(
+        "/v1/references/voice-test-001",
+        headers={**HEADERS, "X-Reference-Extension": ".wav", "Content-Type": "application/octet-stream"},
+        content=b"RIFF-reference",
+    )
+    assert uploaded.status_code == 200
+    uploaded_path = Path(uploaded.json()["path"])
+    assert uploaded_path.parent == references.resolve()
+    assert uploaded_path.read_bytes() == b"RIFF-reference"
+
+    created = test_client.post("/v1/jobs", headers=HEADERS, json=payload("job-audio-001"))
+    assert created.status_code == 202
+    wait_for_terminal(test_client, "job-audio-001")
+    output = main.settings.outputs_dir / "job-audio-001.wav"
+    output.write_bytes(b"RIFF-output")
+    assert main.store is not None
+    main.store.complete("job-audio-001", output_path=str(output), audio_duration=0.25, message="Ready")
+    assert test_client.get("/v1/jobs/job-audio-001/audio").status_code == 401
+    downloaded = test_client.get("/v1/jobs/job-audio-001/audio", headers=HEADERS)
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"].startswith("audio/wav")
+    assert downloaded.content == b"RIFF-output"
+
+
+def test_voxcpm2_mode_mapping_matches_upstream_api():
+    design = SynthesisRequest(**payload("job-design-map", mode="design", description="suara pria hangat"))
+    assert generation_arguments(design) == {"text": "(suara pria hangat)Selamat datang di pengujian worker lokal."}
+
+    clone = SynthesisRequest(**payload("job-clone-map", mode="clone", style="cheerful", reference_path="/workspace/references/voice.wav"))
+    clone_arguments = generation_arguments(clone)
+    assert clone_arguments["text"].startswith("(cheerful, warm delivery)")
+    assert clone_arguments["reference_wav_path"] == "/workspace/references/voice.wav"
+
+    hifi = SynthesisRequest(**payload("job-hifi-map", mode="hifi", transcript="Teks referensi.", reference_path="/workspace/references/voice.wav"))
+    hifi_arguments = generation_arguments(hifi)
+    assert hifi_arguments["prompt_wav_path"] == hifi_arguments["reference_wav_path"]
+    assert hifi_arguments["prompt_text"] == "Teks referensi."
+
+
+def test_voxcpm2_runtime_writes_an_atomic_wav_without_real_gpu(tmp_path: Path):
+    class FakeModel:
+        tts_model = type("TtsModel", (), {"sample_rate": 4})()
+
+        def generate(self, **arguments):
+            assert arguments["text"] == "Uji keluaran."
+            assert arguments["cfg_value"] == 2.0
+            assert arguments["inference_timesteps"] == 10
+            return [0.0, 0.25, -0.25, 0.0]
+
+    class FakeSoundFile:
+        @staticmethod
+        def write(path, waveform, sample_rate, **options):
+            assert len(waveform) == sample_rate
+            assert options == {"format": "WAV", "subtype": "PCM_16"}
+            Path(path).write_bytes(b"RIFF-fake-wave")
+
+    runtime = VoxCPMRuntime(
+        Settings(
+            mode="voxcpm2",
+            api_key=API_KEY,
+            data_dir=tmp_path / "worker",
+            model_dir=tmp_path / "models",
+            cache_dir=tmp_path / "cache",
+            references_dir=tmp_path / "references",
+            outputs_dir=tmp_path / "outputs",
+            simulation_delay_ms=0,
+        )
+    )
+    runtime._model = FakeModel()
+    runtime._soundfile = FakeSoundFile()
+    runtime._set_status("ready", "Ready", "Fake GPU")
+    request = SynthesisRequest(**payload("job-output-map", text="Uji keluaran."))
+    output = tmp_path / "outputs" / "job-output-map.wav"
+    result = runtime.generate(request, output, lambda: False)
+    assert result.audio_duration == 1.0
+    assert output.read_bytes() == b"RIFF-fake-wave"
+    assert not list(output.parent.glob("*.tmp"))

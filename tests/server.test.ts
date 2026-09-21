@@ -58,6 +58,12 @@ test("store contains reference paths and caps history at 100 jobs", async () => 
   try {
     assert.throws(() => store.referencePath("../outside.wav"), /Invalid/);
     assert.ok(store.referencePath("12345678-abcd.wav").startsWith(resolve(store.referencesDir)));
+    assert.throws(() => store.outputPath("../outside.wav"), /Invalid/);
+    const outputName = await store.saveOutput("job_backend_output1", new Uint8Array([82, 73, 70, 70]));
+    assert.equal(outputName, "job_backend_output1.wav");
+    assert.deepEqual(await readFile(store.outputPath(outputName)), Buffer.from([82, 73, 70, 70]));
+    await store.clearOutputs();
+    await assert.rejects(readFile(store.outputPath(outputName)), /ENOENT/);
     for (let index = 0; index < 105; index++) await store.addJob(job(`job_backend_${String(index).padStart(4, "0")}`));
     assert.equal((await store.read()).jobs.length, 100);
   } finally { await removeTemporary(directory); }

@@ -3,7 +3,7 @@
 Backend terdiri dari dua proses yang sengaja dipisah:
 
 1. Next.js pada `127.0.0.1:3000` menyimpan sesi, pengaturan, pekerjaan, metadata suara, referensi, dan hasil. Route Handler berada di `/api/v1/*`.
-2. FastAPI pada `127.0.0.1:8001` menjalankan kontrak worker. Mode saat ini selalu `simulation`: VoxCPM2 tidak dimuat dan tidak ada audio hasil yang dibuat.
+2. FastAPI pada `127.0.0.1:8001` menjalankan kontrak worker. `WORKER_MODE=simulation` tetap menjadi mode lokal default. Image GPU memakai `WORKER_MODE=voxcpm2`, memuat snapshot model yang dipin, dan baru menerima pekerjaan setelah readiness model bernilai `ready`.
 
 Kunci worker hanya dibaca oleh Next.js dan FastAPI. `STUDIO_API_KEY` dipakai untuk klien tepercaya seperti pengujian terminal. Web UI memakai kata sandi terpisah untuk memperoleh cookie sesi `HttpOnly`; `STUDIO_API_KEY`, `WORKER_API_KEY`, dan `STUDIO_SESSION_SECRET` tidak pernah dikirim ke JavaScript browser.
 
@@ -50,6 +50,7 @@ Endpoint data menerima header `X-Studio-Key` untuk klien tepercaya atau cookie s
 | `POST` | `/api/v1/sessions/extend` | Tambah 30 menit, maksimum empat jam sejak mulai. |
 | `GET/POST` | `/api/v1/jobs` | Daftar pekerjaan atau buat pekerjaan idempoten. |
 | `GET` | `/api/v1/jobs/{id}` | Poll status terbaru dari worker. |
+| `GET` | `/api/v1/jobs/{id}/audio` | Baca hasil WAV yang sudah diunduh dari worker. |
 | `POST` | `/api/v1/jobs/{id}/cancel` | Batalkan pekerjaan aktif. |
 | `GET/POST` | `/api/v1/voices` | Daftar metadata atau unggah referensi maksimal 20 MB. |
 | `GET` | `/api/v1/voices/{id}/audio` | Baca kembali referensi dengan `nosniff` dan tanpa cache. |
@@ -81,11 +82,15 @@ Login dibatasi lima kegagalan per sumber selama lima menit. Mengganti `STUDIO_SE
 `GET /health` adalah liveness publik dan tidak menyatakan model siap. Endpoint berikut memakai `X-Worker-Key`:
 
 - `GET /v1/ready`
+- `PUT /v1/references/{id}`
 - `POST /v1/jobs`
 - `GET /v1/jobs/{id}`
+- `GET /v1/jobs/{id}/audio`
 - `POST /v1/jobs/{id}/cancel`
 
-Worker memvalidasi mode, batas teks, deskripsi Voice Design, referensi cloning, transkrip Hi-Fi, serta pembatasan gaya Hi-Fi. `reference_path` wajib menunjuk berkas yang benar-benar berada di `WORKER_REFERENCES_DIR`. Pekerjaan aktif saat worker restart ditandai gagal agar tidak terlihat terus berjalan.
+Worker memvalidasi mode, batas teks, deskripsi Voice Design, referensi cloning, transkrip Hi-Fi, serta pembatasan gaya Hi-Fi. Backend mengunggah referensi maksimal 20 MB ke worker terlebih dahulu; `reference_path` yang dipakai pekerjaan wajib menunjuk berkas di `WORKER_REFERENCES_DIR`. Pekerjaan aktif saat worker restart ditandai gagal agar tidak terlihat terus berjalan.
+
+Pada mode VoxCPM2, output ditulis sebagai WAV secara atomik di `WORKER_OUTPUTS_DIR`. Backend mengunduh hasil maksimal 100 MB melalui endpoint audio terautentikasi, menyimpannya di direktori output aplikasi, lalu menyediakan `/api/v1/jobs/{id}/audio` kepada Web UI. Pembatalan yang terjadi ketika kernel GPU sedang berjalan tidak menghentikan kernel di tengah eksekusi; hasilnya dibuang sebelum commit dan pekerjaan berikutnya menunggu lock GPU.
 
 ## Docker
 
@@ -99,4 +104,13 @@ docker run --rm --publish 8001:8001 `
   voxcpm-worker:simulation
 ```
 
-Container ini hanya memvalidasi kontrak simulasi. Dependensi VoxCPM2/CUDA dan inferensi GPU ditambahkan setelah versi upstream serta image RunPod dipilih dan diuji.
+Container di atas hanya memvalidasi kontrak simulasi. Paket GPU terpisah dapat dibangun tanpa membuat Pod:
+
+```powershell
+docker build --platform linux/amd64 `
+  --file worker/Dockerfile.gpu `
+  --tag voxcpm-worker:gpu `
+  worker
+```
+
+Image GPU memakai base RunPod PyTorch berversi, VoxCPM `2.0.3`, model revision yang dipin, preflight CUDA/VRAM, UID aplikasi `10001`, dan storage `/workspace`. Rincian konfigurasi, batas klaim, serta checklist pengujian berbayar ada di [paket worker GPU](gpu-worker-package.md). Build image tanpa GPU tidak membuktikan bahwa inferensi berhasil.
