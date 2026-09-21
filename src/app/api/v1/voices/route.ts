@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { ServerVoice } from "@/server/contracts";
-import { ApiError, errorResponse, requireStudioKey } from "@/server/http";
+import { ApiError, errorResponse, requireStudioAccess } from "@/server/http";
 import { appStore } from "@/server/store";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ function publicVoice(voice: ServerVoice) {
 }
 
 export async function GET(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     const state = await appStore.read();
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     const declared = Number(request.headers.get("content-length") || 0);

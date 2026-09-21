@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import { readAudio } from "@/lib/audio-storage";
 
-export function AudioPreview({ voiceId }: { voiceId: string }) {
+export function AudioPreview({
+  voiceId,
+  audioUrl,
+}: {
+  voiceId: string;
+  audioUrl?: string;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
+    if (audioUrl) return;
     let disposed = false;
     let objectUrl: string | null = null;
     readAudio(voiceId)
@@ -28,14 +35,15 @@ export function AudioPreview({ voiceId }: { voiceId: string }) {
       disposed = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [voiceId]);
-  if (error)
+  }, [voiceId, audioUrl]);
+  if (!audioUrl && error)
     return (
       <p className="small audio-error" role="alert">
         {error}
       </p>
     );
-  if (!url)
+  const source = audioUrl || url;
+  if (!source)
     return (
       <p className="small muted" role="status">
         Memuat referensi…
@@ -47,7 +55,7 @@ export function AudioPreview({ voiceId }: { voiceId: string }) {
       <audio
         controls
         preload="metadata"
-        src={url}
+        src={source}
         aria-label="Putar rekaman referensi"
       />
     </div>

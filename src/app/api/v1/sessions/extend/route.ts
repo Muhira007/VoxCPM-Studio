@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ApiError, errorResponse, readJson, requireStudioKey } from "@/server/http";
+import { ApiError, errorResponse, readJson, requireStudioAccess } from "@/server/http";
 import { enforceSessionDeadline } from "@/server/services";
 import { appStore } from "@/server/store";
 
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     const body = await readJson(request);

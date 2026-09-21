@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import type { ServerSettings } from "@/server/contracts";
-import { ApiError, errorResponse, readJson, requireStudioKey } from "@/server/http";
+import { ApiError, errorResponse, readJson, requireStudioAccess } from "@/server/http";
 import { appStore } from "@/server/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try { return NextResponse.json({ settings: (await appStore.read()).settings }); }
   catch (error) { return errorResponse(error); }
 }
 
 export async function PUT(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     const body = await readJson(request);

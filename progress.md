@@ -1,14 +1,14 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4 selesai; Fase 5 menunggu saldo RunPod dan batas biaya.**
+Status: **Fase 0–4 dan Fase 4A selesai; Fase 5 menunggu saldo RunPod dan batas biaya.**
 Fase aktif: **Persiapan Fase 5 — akun RunPod dapat diakses, tetapi saldo masih $0,00 sehingga belum ada resource berbayar yang dibuat.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
 Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice design menggunakan VoxCPM2 dengan GPU RunPod yang dinyalakan sesuai kebutuhan. Nama kerja aplikasi: **VoxCPM Studio**.
 
-**Pekerjaan lokal tanpa biaya telah diprioritaskan dan Fase 1–4 selesai. Pengguna belum mempunyai saldo RunPod.** Fase 5 tidak boleh membuat resource berbayar sampai saldo, batas harga, durasi uji, dan strategi storage siap.
+**Pekerjaan lokal tanpa biaya telah diprioritaskan; frontend, backend, container, autentikasi Web UI, dan adapter API sudah selesai. Pengguna belum mempunyai saldo RunPod.** Fase 5 tidak boleh membuat resource berbayar sampai saldo, batas harga, durasi uji, dan strategi storage siap.
 
 - Frontend: Next.js, React, TypeScript, Tailwind CSS; gunakan shadcn/ui bila sesuai kebutuhan komponen.
 - Antarmuka berbahasa Indonesia; fokus pada penggunaan desktop, tetap nyaman di layar kecil.
@@ -180,13 +180,38 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Uji integrasi lokal Next.js ↔ FastAPI lulus: health/readiness, start/stop sesi, pekerjaan normal dan idempoten, polling, unggah/baca ulang WAV 256.044 byte, cloning simulasi, cancel, serta hapus referensi. Tidak ada audio sintesis yang dibuat.
 - `docs/backend-api.md` menjelaskan operasi lokal; `docs/runpod-worker-design.md` merinci lease, deadline cloud, retry stop, verifikasi penghentian, storage, dan keamanan tanpa membuat resource berbayar.
 
-**Batas saat ini:** Web UI masih memakai service demo browser. API key server tidak boleh dipindahkan ke frontend; adapter API menunggu autentikasi pengguna berbasis sesi `HttpOnly` atau keputusan deployment lokal. Worker Docker masih mode simulasi dan belum berisi VoxCPM2/CUDA.
+**Batas pada akhir Fase 4:** Web UI masih memakai service demo browser dan adapter API menunggu autentikasi sesi `HttpOnly`. Batas ini kemudian diselesaikan pada Fase 4A. Worker Docker tetap mode simulasi dan belum berisi VoxCPM2/CUDA.
 
 **Kriteria selesai:** backend dan kontrak worker dapat diuji secara lokal. Container siap untuk pengujian GPU berikutnya. Inference VoxCPM2 tetap belum dianggap lolos sebelum diuji pada GPU.
 
 **Status fase:** selesai. Seluruh checklist wajib telah lulus, termasuk build dan health check container pada lingkungan Linux Docker di GitHub Actions.
 
-## 8. Fase 5 — Integrasi RunPod setelah saldo tersedia
+## 8. Fase 4A — Autentikasi Web UI dan adapter API lokal
+
+- [x] Menyediakan pilihan adapter `demo` atau `api` tanpa menaruh rahasia pada variabel publik.
+- [x] Membuat login kata sandi lokal dengan token HMAC berumur 12 jam pada cookie `HttpOnly` dan `SameSite=Strict`.
+- [x] Menambahkan status sesi, logout, pembatasan percobaan login, dan pemeriksaan same-origin untuk mutasi berbasis cookie.
+- [x] Mempertahankan `X-Studio-Key` untuk klien terminal tepercaya, tanpa mengirimnya ke browser.
+- [x] Membuat adapter `StudioService` API untuk sesi, pengaturan, pekerjaan, polling detail, pembatalan, dan reset backend.
+- [x] Menghubungkan unggah, putar, edit, serta hapus referensi audio ke penyimpanan server lokal.
+- [x] Menyesuaikan label UI agar Mode Demo browser dan Mode API Lokal tidak tertukar.
+- [x] Menguji login/logout, origin guard, polling, pekerjaan simulasi, referensi audio, reset, serta tampilan browser.
+
+**Hasil verifikasi Fase 4A, 21 September 2026:**
+
+- Cookie login memiliki `HttpOnly` dan `SameSite=Strict`; kata sandi salah menghasilkan `401`, mutasi cookie tanpa origin menghasilkan `403`, dan logout menghapus sesi.
+- Browser berhasil membuka Mode API Lokal tanpa menerima `STUDIO_API_KEY`, menyiapkan worker, membuat pekerjaan, dan berpindah dari `queued` ke `succeeded` melalui polling endpoint detail.
+- Integrasi browser ↔ Next.js ↔ FastAPI lulus untuk sesi, pekerjaan tanpa audio palsu, unggah/baca ulang WAV 44 byte, edit metadata suara, reset backend, dan logout.
+- 22/22 pengujian Node lulus, termasuk token kedaluwarsa/tamper, origin guard, sesi browser kedaluwarsa, receiver `fetch`, pemetaan adapter, serta polling status. TypeScript, ESLint, dan build produksi mode API lulus.
+- Data integrasi direset, dua proses pengujian dihentikan, dan `.env.local` berisi rahasia uji dihapus setelah pemeriksaan.
+
+**Batas saat ini:** autentikasi ini ditujukan untuk aplikasi pribadi satu pengguna. Sesi bersifat stateless; mengganti `STUDIO_SESSION_SECRET` membatalkan cookie lama. Worker tetap mode simulasi dan belum memuat VoxCPM2/CUDA.
+
+**Kriteria selesai:** pengguna dapat masuk melalui Web UI, memakai seluruh alur API lokal tanpa melihat kunci server, memantau pekerjaan sampai terminal, lalu keluar. Alur ini telah lulus melalui browser dan pengujian otomatis.
+
+**Status fase:** selesai.
+
+## 9. Fase 5 — Integrasi RunPod setelah saldo tersedia
 
 **Prasyarat:** saldo tersedia, konfigurasi akun siap, serta batas harga dan durasi pengujian ditetapkan bersama pengguna. Pemeriksaan read-only pada 21 September 2026 menunjukkan saldo `$0,00` dan pemakaian `$0/jam`; belum ada resource berbayar yang dibuat.
 
@@ -213,7 +238,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** kontrol GPU bekerja nyata, data bertahan setelah sesi berakhir, dan shutdown berhasil diuji dengan browser tertutup serta PC pengguna tidak menjalankan pengawas lokal.
 
-## 9. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
+## 10. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
 - [ ] Menguji TTS Indonesia, voice design, cloning dengan gaya, dan Hi-Fi cloning secara terpisah.
@@ -231,7 +256,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** pengguna dapat menghasilkan dan mengunduh audio nyata, mengulang bagian yang bermasalah, serta mengakhiri sesi GPU dengan hasil tersimpan. Kualitas dan biaya dilaporkan dari pengukuran.
 
-## 10. Pengembangan lanjutan — di luar syarat selesai MVP
+## 11. Pengembangan lanjutan — di luar syarat selesai MVP
 
 - [ ] Editor dialog multi-speaker dengan suara dan gaya per segmen.
 - [ ] Perbandingan beberapa kandidat hasil audio.
@@ -241,7 +266,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [ ] Evaluasi vLLM-Omni atau engine lain jika antrean dan kebutuhan throughput membenarkannya.
 - [ ] Migrasi ke Serverless atau multi-user jika pola penggunaan sudah membutuhkan.
 
-## 11. Catatan teknis yang harus dipertahankan
+## 12. Catatan teknis yang harus dipertahankan
 
 1. **Frontend dahulu:** mode demo tidak membuat resource, tidak mengonsumsi saldo, dan tidak mengklaim menghasilkan suara AI nyata.
 2. **Persistensi:** folder source di `/workspace` tidak otomatis membuat seluruh environment Python persisten. Dependensi harus tersedia dalam image atau environment yang sengaja dikelola.
@@ -264,7 +289,7 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 - [Custom template RunPod](https://docs.runpod.io/pods/templates/create-custom-template)
 - [Harga RunPod](https://www.runpod.io/pricing)
 
-## 12. Log progres
+## 13. Log progres
 
 | Tanggal | Hasil | Verifikasi | Kendala / langkah berikutnya |
 | --- | --- | --- | --- |
@@ -274,11 +299,12 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 20 September 2026 | Fase 3 selesai: service simulasi, persistensi lokal, skenario kegagalan, dan pembatalan. | 12/12 pengujian otomatis; alur WAV → cloning demo → riwayat, refresh, edit/hapus, dan reset diverifikasi. | Backend/worker lokal pada Fase 4 belum dikerjakan; saldo RunPod belum diperlukan untuk fase tersebut. |
 | 21 September 2026 | API Next.js, penyimpanan server, worker FastAPI simulasi, Dockerfile, dan rancangan kontrol cloud ditambahkan. | 15/15 tes Node, 4/4 tes worker, lint, TypeScript, build Next.js, serta integrasi dua proses lulus. | Docker tidak tersedia sehingga image belum dibangun. Web UI belum dialihkan ke API agar kunci backend tidak bocor ke browser. |
 | 21 September 2026 | Fase 4 selesai melalui validasi container di GitHub Actions tanpa memakai RunPod. | Image berhasil dibangun; container non-root, autentikasi, simulasi, restart/persistensi, dan Docker health check lulus pada run 35540568742. | Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah autentikasi sesi `HttpOnly` dan adapter API Web UI secara lokal sambil menunggu prasyarat Fase 5. |
+| 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
 
-## 13. Langkah pengerjaan berikutnya
+## 14. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** implementasikan autentikasi pengguna lokal berbasis sesi `HttpOnly` dan adapter API untuk `StudioService`, lalu uji Web UI → Next.js API → worker simulasi dari browser. Pekerjaan ini tidak memerlukan GPU dan menutup celah antara UI demo dengan backend yang sudah ada.
+**Rekomendasi selama saldo RunPod masih $0,00:** siapkan paket deployment GPU tanpa membuat Pod: verifikasi API VoxCPM2 upstream terbaru, tentukan base image CUDA/PyTorch dan dependensi terkunci, serta tambahkan pemeriksaan startup yang gagal dengan jelas bila model atau GPU belum siap. Kode inferensi belum boleh diklaim berfungsi sebelum dijalankan pada GPU.
 
-Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Jangan membuat resource GPU hanya karena console sudah dapat dibuka.
+Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.

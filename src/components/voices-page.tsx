@@ -60,11 +60,15 @@ export function VoicesPage() {
     setBusy(true);
     setError("");
     try {
-      await removeAudio(deleting.id);
-      service.removeVoice(deleting.id);
+      if (service.mode === "demo") await removeAudio(deleting.id);
+      await service.removeVoice(deleting.id);
       setDeleting(null);
       setDetail(null);
-      toast("Referensi dihapus dari browser ini.");
+      toast(
+        service.mode === "api"
+          ? "Referensi dihapus dari backend lokal."
+          : "Referensi dihapus dari browser ini.",
+      );
     } catch (problem) {
       setError(
         problem instanceof Error ? problem.message : "Referensi gagal dihapus.",
@@ -259,7 +263,11 @@ export function VoicesPage() {
             </div>
             {detail.source === "upload" ? (
               <>
-                <AudioPreview key={detail.id} voiceId={detail.id} />
+                <AudioPreview
+                  key={detail.id}
+                  voiceId={detail.id}
+                  audioUrl={detail.audioUrl}
+                />
                 <p className="small muted">
                   {detail.fileName} · {formatTime(detail.duration ?? 0)}
                 </p>

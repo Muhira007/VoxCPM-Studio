@@ -1,6 +1,6 @@
 # VoxCPM Studio
 
-Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Fase 1–4 selesai: Web UI demo, API lokal, worker simulasi, dan image container telah diverifikasi. Belum terhubung ke VoxCPM2 atau RunPod dan belum menghasilkan audio AI.**
+Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, worker simulasi, dan image container telah diverifikasi. Belum terhubung ke VoxCPM2 atau RunPod dan belum menghasilkan audio AI.**
 
 ## Menjalankan aplikasi
 
@@ -23,7 +23,7 @@ npm start
 
 Unduhan paket membutuhkan internet saat instalasi. Font dan ikon disertakan melalui dependensi lokal; proses demo dan rekaman referensi tidak memanggil layanan cloud.
 
-Perintah di atas hanya membutuhkan frontend demo. Untuk menjalankan API aplikasi dan worker FastAPI lokal, ikuti [panduan backend Fase 4](docs/backend-api.md). Kedua proses membutuhkan dua kunci lokal yang berbeda, tetapi tidak membutuhkan akun atau saldo RunPod.
+Perintah di atas menjalankan frontend demo. Untuk memakai Web UI melalui API aplikasi dan worker FastAPI lokal, ikuti [panduan backend lokal](docs/backend-api.md). Mode tersebut memakai kata sandi studio, cookie sesi `HttpOnly`, dan dua kunci backend yang berbeda, tetapi tidak membutuhkan akun atau saldo RunPod.
 
 ## Fitur yang bisa dicoba
 
@@ -54,9 +54,10 @@ Urutan mencoba:
 - Hanya satu pekerjaan aktif diizinkan. Klik berulang dilindungi di lapisan service.
 - Idle timeout tidak menghentikan pekerjaan aktif. Tenggat sesi maksimum tetap dapat membatalkan pekerjaan. Total sesi dibatasi empat jam.
 - Timer ini hanya simulasi di browser, **belum menjadi pengaman biaya cloud**. Tab latar belakang dapat menunda callback; tenggat diperiksa berdasarkan waktu saat callback berjalan kembali.
-- Route Handler aplikasi dan worker FastAPI sudah tersedia sebagai kontrak simulasi terautentikasi. Web UI masih memakai adapter demo browser; kunci backend tidak dikirim ke browser.
+- `NEXT_PUBLIC_STUDIO_SERVICE=demo` memakai state browser. Nilai `api` menampilkan login dan memakai adapter API; hanya pilihan mode ini yang publik, sedangkan seluruh kunci dan secret tetap berada di server.
 - Metadata backend tersimpan atomik di `.data/studio-state.json`; referensi dan output mempunyai direktori terpisah. Folder `.data` diabaikan Git dan perlu dipetakan ke volume persisten saat deployment.
-- Belum ada inferensi model, audio keluaran, konversi MP3, autentikasi pengguna Web UI, atau kontrol Pod sungguhan. Kemampuan dan kualitas suara VoxCPM2 masih harus diuji pada fase GPU.
+- Mode API menyimpan draft di browser serta sesi, riwayat, pengaturan, dan referensi audio pada backend lokal. Logout menghapus cookie; reset backend memerlukan konfirmasi UI.
+- Belum ada inferensi model, audio keluaran, konversi MP3, atau kontrol Pod sungguhan. Kemampuan dan kualitas suara VoxCPM2 masih harus diuji pada fase GPU.
 
 ## Pemeriksaan
 
@@ -68,9 +69,9 @@ npm test
 npm run build
 ```
 
-Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, kontrak health/readiness, autentikasi worker, idempotensi, antrean tunggal, pembatalan, dan kegagalan simulasi.
+Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, dan kegagalan simulasi.
 
-Integrasi Next.js ↔ FastAPI telah diuji lokal: sesi, pekerjaan normal/idempoten, polling, unggah serta baca ulang WAV, cloning simulasi, pembatalan, penghapusan referensi, dan stop sesi. Image Docker juga berhasil dibangun dan diuji pada [GitHub Actions](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742), termasuk health check dan persistensi setelah restart.
+Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Image Docker juga berhasil dibangun dan diuji pada [GitHub Actions](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742), termasuk health check dan persistensi setelah restart.
 
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 
@@ -81,6 +82,7 @@ src/app/                  Route, layout, loading/error, dan gaya
 src/components/           Halaman interaktif dan komponen bersama
 src/lib/types.ts          Kontrak service dan tipe data
 src/lib/demo-service.ts   State machine simulasi, validasi, persistensi metadata
+src/lib/api-service.ts    Adapter browser untuk API lokal dan polling worker
 src/lib/audio-storage.ts  Penyimpanan dan validasi audio di browser
 src/lib/fixtures.ts       Naskah, inspirasi, profil GPU, dan label demo
 src/lib/webmcp.ts         Peningkatan opsional untuk browser yang mendukung WebMCP
@@ -93,7 +95,7 @@ tests/                    Pengujian frontend dan backend Node
 .github/workflows/        Validasi otomatis image dan kontrak container
 ```
 
-Halaman memakai kontrak `StudioService` melalui provider. Adapter API dapat menggantikan service demo pada langkah berikutnya setelah autentikasi pengguna Web UI ditetapkan. Kontrak dan penyimpanan server telah tersedia di Fase 4. Gunakan [progress.md](progress.md) sebagai urutan pekerjaan dan catatan keputusan; rancangan shutdown cloud ada di [docs/runpod-worker-design.md](docs/runpod-worker-design.md).
+Halaman memakai kontrak `StudioService` melalui provider. Provider memilih adapter demo atau API berdasarkan konfigurasi publik non-rahasia; mode API memakai sesi `HttpOnly` dan tidak mengirim `STUDIO_API_KEY` ke browser. Gunakan [progress.md](progress.md) sebagai urutan pekerjaan dan catatan keputusan; rancangan shutdown cloud ada di [docs/runpod-worker-design.md](docs/runpod-worker-design.md).
 
 WebMCP dideteksi secara opsional melalui `document.modelContext`. Jika tersedia, dua alat membaca status demo dan mengganti draft memakai state yang sama dengan UI. Pendaftaran dibersihkan dengan `AbortSignal`; browser tanpa dukungan tetap dapat memakai seluruh UI. Verifikasi dalam konteks WebMCP yang mendukung belum dilakukan; fitur ini bukan prasyarat demo lokal.
 

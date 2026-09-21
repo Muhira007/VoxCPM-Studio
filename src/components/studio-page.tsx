@@ -47,7 +47,7 @@ export function StudioPage() {
     setError("");
     try {
       if (session.status !== "ready") {
-        service.startSession();
+        await service.startSession();
         return;
       }
       const validation = validateRequest(draft, state.voices);
@@ -55,7 +55,7 @@ export function StudioPage() {
         setError(validation);
         return;
       }
-      if (referenceMode) {
+      if (referenceMode && service.mode === "demo") {
         setChecking(true);
         if (!(await readAudio(draft.voiceId)))
           throw new Error(
@@ -66,7 +66,7 @@ export function StudioPage() {
             "Naskah atau referensi berubah saat diperiksa. Jalankan kembali simulasi.",
           );
       }
-      service.generate();
+      await service.generate();
     } catch (problem) {
       setError(
         problem instanceof Error
@@ -94,8 +94,12 @@ export function StudioPage() {
       <div className="demo-notice">
         <Info size={17} />
         <p>
-          <strong>Kamu berada di Mode Demo.</strong> GPU dan proses suara
-          disimulasikan, tanpa memakai saldo.
+          <strong>
+            {service.mode === "api"
+              ? "Web UI terhubung ke API lokal."
+              : "Kamu berada di Mode Demo."}
+          </strong>{" "}
+          Proses suara masih disimulasikan, tanpa memakai saldo.
         </p>
         <Link href="/gpu">
           Lihat sesi <span>→</span>
@@ -207,7 +211,9 @@ export function StudioPage() {
               <span>
                 {loadingGpu
                   ? GPU_LABELS[session.status] + "…"
-                  : "Draft tersimpan otomatis di perangkat ini."}
+                  : service.mode === "api"
+                    ? "Draft di browser; pekerjaan tersimpan di backend lokal."
+                    : "Draft tersimpan otomatis di perangkat ini."}
               </span>
             </div>
             <button
@@ -226,7 +232,9 @@ export function StudioPage() {
                   ? GPU_LABELS[session.status]
                   : session.status === "ready"
                     ? "Jalankan simulasi"
-                    : "Siapkan sesi demo"}
+                    : service.mode === "api"
+                      ? "Siapkan worker lokal"
+                      : "Siapkan sesi demo"}
             </button>
           </div>
         </section>
@@ -267,6 +275,7 @@ export function StudioPage() {
                   <AudioPreview
                     key={selectedVoice.id}
                     voiceId={selectedVoice.id}
+                    audioUrl={selectedVoice.audioUrl}
                   />
                 )}
               </>
@@ -392,8 +401,9 @@ export function StudioPage() {
       </div>
       <div className="bottom-note">
         <Cpu size={15} />
-        GPU dinyalakan sesuai kebutuhan. Saat ini seluruh proses berjalan
-        sebagai simulasi.
+        {service.mode === "api"
+          ? "Web UI terhubung ke worker simulasi lokal. Belum ada GPU atau resource RunPod."
+          : "GPU dinyalakan sesuai kebutuhan. Saat ini seluruh proses berjalan sebagai simulasi."}
       </div>
       <Modal
         open={picker}

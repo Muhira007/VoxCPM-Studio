@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ApiError, errorResponse, requireStudioKey } from "@/server/http";
+import { ApiError, errorResponse, requireStudioAccess } from "@/server/http";
 import { enforceSessionDeadline, publicJob } from "@/server/services";
 import { appStore } from "@/server/store";
 import { validId } from "@/server/validation";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     await enforceSessionDeadline();

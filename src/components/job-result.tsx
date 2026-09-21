@@ -80,7 +80,15 @@ export function JobResult({
         {busy ? (
           <button
             className="button small-button"
-            onClick={() => service.cancelJob(job.id)}
+            onClick={() => {
+              void Promise.resolve(service.cancelJob(job.id)).catch((error) =>
+                toast(
+                  error instanceof Error
+                    ? error.message
+                    : "Pekerjaan gagal dibatalkan.",
+                ),
+              );
+            }}
           >
             Batalkan
           </button>

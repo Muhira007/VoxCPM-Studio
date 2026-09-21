@@ -7,6 +7,7 @@ import {
   CircleHelp,
   Cpu,
   History,
+  LogOut,
   Menu,
   Settings2,
   Sparkles,
@@ -14,6 +15,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { useStudio } from "./studio-provider";
 import { Modal, ToastProvider } from "./ui";
 
 const nav = [
@@ -25,9 +27,12 @@ const nav = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { service } = useStudio();
   const pathname = usePathname();
   const [menu, setMenu] = useState(false);
   const [help, setHelp] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const apiMode = service.mode === "api";
   return (
     <ToastProvider>
       <div className="app-layout">
@@ -65,10 +70,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="demo-symbol">
                 <Sparkles size={18} />
               </span>
-              <strong>Ruang untuk bereksperimen</strong>
-              <p>Coba alur studio secara lokal, tanpa memakai saldo GPU.</p>
+              <strong>
+                {apiMode
+                  ? "Backend lokal terhubung"
+                  : "Ruang untuk bereksperimen"}
+              </strong>
+              <p>
+                {apiMode
+                  ? "Web UI memakai API dan worker simulasi lokal tanpa saldo GPU."
+                  : "Coba alur studio secara lokal, tanpa memakai saldo GPU."}
+              </p>
               <button onClick={() => setHelp(true)}>
-                Tentang Mode Demo <ArrowUpRight size={15} />
+                {apiMode ? "Tentang Mode API" : "Tentang Mode Demo"}{" "}
+                <ArrowUpRight size={15} />
               </button>
             </div>
             <button className="help-link" onClick={() => setHelp(true)}>
@@ -79,9 +93,30 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="avatar">L</span>
               <div>
                 <strong>Ruang pribadi</strong>
-                <span>Tersimpan di perangkat ini</span>
+                <span>
+                  {apiMode
+                    ? "Tersimpan di server lokal"
+                    : "Tersimpan di perangkat ini"}
+                </span>
               </div>
-              <span className="online-dot" />
+              {apiMode ? (
+                <button
+                  className="icon-button profile-logout"
+                  aria-label="Keluar dari sesi studio"
+                  title="Keluar"
+                  disabled={loggingOut}
+                  onClick={() => {
+                    setLoggingOut(true);
+                    void Promise.resolve(service.logout()).finally(() =>
+                      window.location.reload(),
+                    );
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
+              ) : (
+                <span className="online-dot" />
+              )}
             </div>
           </div>
         </aside>
@@ -130,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
               <button className="demo-badge" onClick={() => setHelp(true)}>
                 <span />
-                Mode Demo
+                {apiMode ? "API Lokal" : "Mode Demo"}
               </button>
             </div>
           </header>
@@ -148,7 +183,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Modal
           open={help}
           onOpenChange={setHelp}
-          title="Selamat datang di Mode Demo"
+          title={apiMode ? "Mode API lokal aktif" : "Selamat datang di Mode Demo"}
           description="Kenali alur studio sebelum menghubungkan GPU."
         >
           <div className="help-steps">
@@ -158,18 +193,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
             <p>
               <strong>2. Coba sesi GPU.</strong> Proses pemuatan dan pekerjaan
-              disimulasikan. Tidak ada resource RunPod atau tagihan yang dibuat.
+              disimulasikan {apiMode ? "oleh worker lokal" : "di browser"}.
+              Tidak ada resource RunPod atau tagihan yang dibuat.
             </p>
             <p>
               <strong>3. Lihat riwayat.</strong> Demo mencatat alur pekerjaan,
-              tetapi belum menghasilkan suara AI. Audio yang diunggah hanya
-              menjadi referensi lokal.
+              tetapi belum menghasilkan suara AI. Audio yang diunggah menjadi
+              referensi {apiMode ? "pada storage backend lokal" : "di browser"}.
             </p>
           </div>
           <p className="info-note">
-            Draft dan referensi hanya tersedia pada browser serta perangkat ini.
-            Integrasi model dan shutdown cloud akan dikerjakan di fase
-            berikutnya.
+            {apiMode
+              ? "Draft tersimpan di browser; referensi dan riwayat tersimpan pada backend lokal."
+              : "Draft dan referensi hanya tersedia pada browser serta perangkat ini."}{" "}
+            Integrasi model dan shutdown cloud akan dikerjakan di fase berikutnya.
           </p>
           <button
             className="button primary full"

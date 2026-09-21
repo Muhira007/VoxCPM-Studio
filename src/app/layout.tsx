@@ -15,9 +15,9 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body>
-        <AppShell>
-          <StudioProvider>{children}</StudioProvider>
-        </AppShell>
+        <StudioProvider>
+          <AppShell>{children}</AppShell>
+        </StudioProvider>
       </body>
     </html>
   );

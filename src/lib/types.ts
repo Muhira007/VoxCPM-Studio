@@ -15,6 +15,7 @@ export interface Voice {
   color: "orange" | "purple" | "blue" | "green";
   duration?: number;
   fileName?: string;
+  audioUrl?: string;
   createdAt: number;
 }
 
@@ -70,19 +71,21 @@ export interface StudioSnapshot {
 }
 
 export interface StudioService {
+  readonly mode: "demo" | "api";
   subscribe(listener: () => void): () => void;
   getSnapshot(): StudioSnapshot;
   updateDraft(patch: Partial<SynthesisRequest>): void;
   updateSettings(patch: Partial<AppSettings>): void;
-  startSession(): void;
-  stopSession(): void;
-  extendSession(): void;
-  generate(): void;
-  cancelJob(id: string): void;
-  addVoice(voice: Voice): void;
-  editVoice(id: string, name: string, description: string): void;
-  removeVoice(id: string): void;
-  resetLocalData(): void;
+  startSession(): void | Promise<void>;
+  stopSession(): void | Promise<void>;
+  extendSession(): void | Promise<void>;
+  generate(): void | Promise<void>;
+  cancelJob(id: string): void | Promise<void>;
+  addVoice(voice: Voice, file?: File): string | Promise<string>;
+  editVoice(id: string, name: string, description: string): void | Promise<void>;
+  removeVoice(id: string): void | Promise<void>;
+  resetLocalData(): void | Promise<void>;
+  logout(): void | Promise<void>;
 }
 
 // Local adapter lifecycle is kept in the provider, away from page components.

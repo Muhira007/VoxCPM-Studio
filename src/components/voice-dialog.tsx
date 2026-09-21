@@ -59,11 +59,12 @@ export function VoiceDialog({
     setError("");
     setBusy(true);
     try {
-      if (voice) service.editVoice(voice.id, name.trim(), description.trim());
+      if (voice)
+        await service.editVoice(voice.id, name.trim(), description.trim());
       else if (file) {
         const id = crypto.randomUUID();
-        await saveAudio(id, file);
-        service.addVoice({
+        if (service.mode === "demo") await saveAudio(id, file);
+        const createdId = await service.addVoice({
           id,
           name: name.trim(),
           description: description.trim(),
@@ -72,13 +73,15 @@ export function VoiceDialog({
           duration,
           fileName: file.name,
           createdAt: Date.now(),
-        });
-        onCreated?.(id);
+        }, file);
+        onCreated?.(createdId);
       }
       toast(
         voice
           ? "Detail suara diperbarui."
-          : "Referensi tersimpan di browser ini.",
+          : service.mode === "api"
+            ? "Referensi tersimpan di backend lokal."
+            : "Referensi tersimpan di browser ini.",
       );
       onOpenChange(false);
     } catch (problem) {
@@ -98,7 +101,7 @@ export function VoiceDialog({
         if (!busy) onOpenChange(next);
       }}
       title={voice ? "Edit referensi suara" : "Tambahkan suaramu"}
-      description="Rekaman disimpan lokal. Gunakan suara milikmu atau yang kamu punya izin untuk gunakan."
+      description={`Rekaman disimpan ${service.mode === "api" ? "pada backend lokal" : "di browser"}. Gunakan suara milikmu atau yang kamu punya izin untuk gunakan.`}
     >
       <form onSubmit={submit} className="form-stack">
         {!voice && (

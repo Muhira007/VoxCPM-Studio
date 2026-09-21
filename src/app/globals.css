@@ -292,6 +292,14 @@ select:focus {
 .profile > .online-dot {
   margin-left: auto;
 }
+.profile-logout {
+  margin-left: auto;
+  color: #8d929d;
+}
+.profile-logout:hover {
+  color: #f2a17f;
+  background: #ffffff0b;
+}
 .main-column {
   margin-left: 232px;
   flex: 1;
@@ -996,6 +1004,84 @@ select:focus {
   color: #7d8390;
   font-size: 14px;
 }
+.login-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 22% 20%, #f8e8dc 0, transparent 32%),
+    radial-gradient(circle at 80% 78%, #eae6f7 0, transparent 34%),
+    #f5f5f7;
+}
+.login-card {
+  width: min(460px, 100%);
+  border: 1px solid #dedfe5;
+  background: #fffffff2;
+  box-shadow: 0 22px 70px #31343d1c;
+  border-radius: 18px;
+  padding: 34px;
+}
+.login-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #c46844;
+  background: #fbe9df;
+  margin-bottom: 24px;
+}
+.login-card h1 {
+  font-size: 27px;
+  line-height: 1.2;
+  color: #353943;
+}
+.login-card > div > p {
+  color: #747985;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-top: 10px;
+}
+.login-card code {
+  font-size: 12px;
+  background: #f0f1f4;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+.login-card form {
+  margin-top: 26px;
+}
+.password-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 0 12px;
+  margin-top: 8px;
+  color: #9a9faa;
+  background: #fff;
+}
+.password-field:focus-within {
+  border-color: #d49a7f;
+  box-shadow: 0 0 0 3px #d49a7f1c;
+}
+.password-field input {
+  border: 0;
+  outline: 0;
+  min-height: 44px;
+  width: 100%;
+  background: transparent;
+}
+.login-note {
+  border-top: 1px solid #ececf0;
+  color: #858a94;
+  font-size: 12px;
+  line-height: 1.65;
+  margin-top: 26px;
+  padding-top: 18px;
+}
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -1134,6 +1220,12 @@ select:focus {
   }
 }
 @media (max-width: 720px) {
+  .login-page {
+    padding: 18px;
+  }
+  .login-card {
+    padding: 26px 22px;
+  }
   .sidebar {
     display: none;
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ApiError, errorResponse, readJson, requireStudioKey } from "@/server/http";
+import { ApiError, errorResponse, readJson, requireStudioAccess } from "@/server/http";
 import { enforceSessionDeadline, stopSession } from "@/server/services";
 import { appStore } from "@/server/store";
 import { workerReady } from "@/server/worker-client";
@@ -8,14 +8,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try { return NextResponse.json({ session: await enforceSessionDeadline() }); }
   catch (error) { return errorResponse(error); }
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     const body = await readJson(request);
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try { return NextResponse.json({ session: await stopSession() }); }
   catch (error) { return errorResponse(error); }

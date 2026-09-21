@@ -26,20 +26,28 @@ export function SettingsPage() {
   const scenarios: { id: DemoScenario; label: string }[] = [
     { id: "normal", label: "Normal — proses berhasil" },
     { id: "unavailable", label: "GPU tidak tersedia" },
-    { id: "slow", label: "Pemuatan model lambat" },
+    { id: "slow", label: "Proses worker lambat" },
     { id: "failure", label: "Pekerjaan sintesis gagal" },
     { id: "disconnected", label: "Koneksi worker terputus" },
-  ];
+  ].filter(
+    (item) =>
+      service.mode === "demo" ||
+      !["unavailable", "disconnected"].includes(item.id),
+  ) as { id: DemoScenario; label: string }[];
   async function resetAll() {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
-      await clearAudio();
-      service.resetLocalData();
+      if (service.mode === "demo") await clearAudio();
+      await service.resetLocalData();
       setPrice(String(service.getSnapshot().settings.maxHourlyRate));
       setReset(false);
-      toast("Data lokal direset. Ruang kerja kembali ke pengaturan awal.");
+      toast(
+        service.mode === "api"
+          ? "Data backend lokal direset."
+          : "Data lokal direset. Ruang kerja kembali ke pengaturan awal.",
+      );
     } catch (problem) {
       setError(
         problem instanceof Error
@@ -58,7 +66,11 @@ export function SettingsPage() {
           <h1>
             Atur, lalu fokus berkarya<span>.</span>
           </h1>
-          <p>Preferensi ini hanya berlaku pada browser dan perangkat ini.</p>
+          <p>
+            {service.mode === "api"
+              ? "Preferensi sesi disimpan pada backend lokal."
+              : "Preferensi ini hanya berlaku pada browser dan perangkat ini."}
+          </p>
         </div>
         <span className="saved-label">
           <Check size={15} />
@@ -85,11 +97,15 @@ export function SettingsPage() {
         <div className="settings-row">
           <div>
             <strong>Mode aplikasi</strong>
-            <p>Seluruh kontrol GPU dan proses sintesis disimulasikan.</p>
+            <p>
+              {service.mode === "api"
+                ? "Web UI terhubung ke API dan worker simulasi lokal."
+                : "Seluruh kontrol GPU dan proses sintesis disimulasikan."}
+            </p>
           </div>
           <span className="demo-badge">
             <span />
-            Mode Demo
+            {service.mode === "api" ? "API Lokal" : "Mode Demo"}
           </span>
         </div>
         <div className="settings-row">
@@ -241,8 +257,9 @@ export function SettingsPage() {
             <strong>Draft, referensi, dan riwayat</strong>
             <p>
               {state.voices.filter((voice) => voice.source === "upload").length}{" "}
-              referensi lokal · {state.jobs.length} pekerjaan demo. Data tidak
-              disinkronkan ke cloud.
+              referensi {service.mode === "api" ? "server" : "lokal"} ·{" "}
+              {state.jobs.length} pekerjaan simulasi. Data tidak disinkronkan ke
+              cloud.
             </p>
           </div>
           <button
@@ -253,22 +270,26 @@ export function SettingsPage() {
             }}
           >
             <Trash2 size={15} />
-            Reset data lokal
+            {service.mode === "api" ? "Reset backend lokal" : "Reset data lokal"}
           </button>
         </div>
       </section>
       <p className="info-note">
         <Info size={17} />
-        Jangan menyimpan API key pada halaman ini. Mode demo tidak membutuhkan
-        kredensial apa pun.
+        Jangan menyimpan API key pada halaman ini. Mode API memakai cookie sesi
+        HttpOnly; mode demo tidak membutuhkan kredensial.
       </p>
       <Modal
         open={reset}
         onOpenChange={(open) => {
           if (!busy) setReset(open);
         }}
-        title="Reset seluruh data lokal?"
-        description="Draft, rekaman referensi, riwayat, dan preferensi VoxCPM Studio di browser ini akan dihapus. Sesi demo yang berjalan akan dihentikan. Berkas asli di perangkat tetap ada."
+        title={service.mode === "api" ? "Reset seluruh data backend lokal?" : "Reset seluruh data lokal?"}
+        description={
+          service.mode === "api"
+            ? "Draft browser, rekaman referensi backend, riwayat, dan preferensi akan dihapus. Sesi simulasi yang berjalan akan dihentikan. Berkas asli di perangkat tetap ada."
+            : "Draft, rekaman referensi, riwayat, dan preferensi VoxCPM Studio di browser ini akan dihapus. Sesi demo yang berjalan akan dihentikan. Berkas asli di perangkat tetap ada."
+        }
       >
         {error && <ErrorMessage>{error}</ErrorMessage>}
         <div className="dialog-actions">

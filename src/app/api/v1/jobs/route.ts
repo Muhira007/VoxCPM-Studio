@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { ServerJob } from "@/server/contracts";
-import { ApiError, errorResponse, readJson, requireStudioKey } from "@/server/http";
+import { ApiError, errorResponse, readJson, requireStudioAccess } from "@/server/http";
 import { enforceSessionDeadline, publicJob } from "@/server/services";
 import { appStore } from "@/server/store";
 import { parseSynthesisRequest, requestHash, validId } from "@/server/validation";
@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     await enforceSessionDeadline();
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = requireStudioKey(request);
+  const unauthorized = requireStudioAccess(request);
   if (unauthorized) return unauthorized;
   try {
     await enforceSessionDeadline();

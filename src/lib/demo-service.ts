@@ -126,6 +126,7 @@ function normalizedSettings(value: Partial<AppSettings>): AppSettings {
 
 // This adapter never contacts RunPod or creates AI audio. Replace behind StudioService later.
 export class DemoStudioService implements StudioService {
+  readonly mode = "demo" as const;
   private snapshot: StudioSnapshot = {
     hydrated: false,
     draft: { ...DEFAULT_DRAFT },
@@ -252,6 +253,7 @@ export class DemoStudioService implements StudioService {
   }
   addVoice(voice: Voice) {
     this.publish({ voices: [...this.snapshot.voices, voice] });
+    return voice.id;
   }
   editVoice(id: string, name: string, description: string) {
     this.publish({
@@ -484,4 +486,5 @@ export class DemoStudioService implements StudioService {
     this.clearTimers(this.sessionTimers);
     this.clearTimers(this.jobTimers);
   }
+  logout() {}
 }

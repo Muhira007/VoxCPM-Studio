@@ -41,20 +41,20 @@ export function GpuPage() {
         );
   const remaining =
     session.expiresAt === null ? 0 : (session.expiresAt - state.now) / 1000;
-  function start() {
+  async function start() {
     setError("");
     try {
-      service.startSession();
+      await service.startSession();
     } catch (problem) {
       setError(
         problem instanceof Error ? problem.message : "Sesi gagal dimulai.",
       );
     }
   }
-  function extend() {
+  async function extend() {
     setError("");
     try {
-      service.extendSession();
+      await service.extendSession();
       toast("Sesi demo diperpanjang 30 menit.");
     } catch (problem) {
       setError(
@@ -80,14 +80,15 @@ export function GpuPage() {
         </div>
         <span className="demo-badge">
           <span />
-          Sesi simulasi
+          {service.mode === "api" ? "Worker lokal" : "Sesi simulasi"}
         </span>
       </div>
       <div className="demo-notice">
         <Info size={17} />
         <p>
           Seluruh status dan biaya di halaman ini adalah{" "}
-          <strong>simulasi lokal</strong>. Tidak terhubung ke RunPod.
+          <strong>simulasi lokal</strong> {service.mode === "api" ? "melalui API" : "di browser"}.
+          Tidak terhubung ke RunPod.
         </p>
       </div>
       <section className="session-panel panel">
@@ -119,7 +120,7 @@ export function GpuPage() {
                 Akhiri sesi
               </button>
             ) : (
-              <button className="button primary" onClick={start}>
+              <button className="button primary" onClick={() => void start()}>
                 <Play size={16} fill="currentColor" />
                 Mulai sesi demo
               </button>
@@ -166,7 +167,7 @@ export function GpuPage() {
             <button
               className="text-button accent"
               disabled={!active || session.status === "stopping"}
-              onClick={extend}
+              onClick={() => void extend()}
             >
               <Plus size={13} />
               Tambah 30 menit
@@ -304,9 +305,18 @@ export function GpuPage() {
           <button
             className="button primary"
             onClick={() => {
-              service.stopSession();
-              setConfirm(false);
-              toast("Sesi demo diakhiri.");
+              void Promise.resolve(service.stopSession())
+                .then(() => {
+                  setConfirm(false);
+                  toast("Sesi simulasi diakhiri.");
+                })
+                .catch((problem) =>
+                  setError(
+                    problem instanceof Error
+                      ? problem.message
+                      : "Sesi gagal diakhiri.",
+                  ),
+                );
             }}
           >
             <Power size={16} />
