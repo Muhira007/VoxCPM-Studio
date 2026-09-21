@@ -20,6 +20,7 @@ import { RunpodRestControlGateway } from "../src/server/runpod-control-gateway.t
 import {
   RunpodController,
   type RunpodControllerConfig,
+  type RunpodWorkloadSnapshot,
 } from "../src/server/runpod-controller.ts";
 import { RunpodControlStore } from "../src/server/runpod-control-store.ts";
 import { runRunpodWatchdogOnce } from "../src/server/runpod-watchdog-runner.ts";
@@ -38,6 +39,20 @@ const config: RunpodControllerConfig = {
   hardCostLimitUsd: 1,
   maximumSessionMinutes: 240,
 };
+
+function idleWorkload(value: Partial<RunpodWorkloadSnapshot> = {}): {
+  snapshot: () => Promise<RunpodWorkloadSnapshot>;
+} {
+  return {
+    snapshot: async () => ({
+      runningJobCount: 0,
+      queuedJobCount: 0,
+      lastActivityAt: null,
+      idleMinutes: 10,
+      ...value,
+    }),
+  };
+}
 
 function managedPod(
   status: ManagedRunpodPod["status"] = "PROVISIONING",
@@ -446,6 +461,7 @@ test("watchdog retries a failed stop and closes only after verified EXITED", asy
       catalog: { overview: async () => overview() },
       config,
       now: () => clock,
+      workload: idleWorkload(),
     });
     await controller.start({
       operationId: "operation_watchdog_01",
@@ -491,6 +507,7 @@ test("watchdog backs off when stop is accepted but not yet verified", async () =
       catalog: { overview: async () => overview() },
       config,
       now: () => clock,
+      workload: idleWorkload(),
     });
     await controller.start({
       operationId: "operation_unverified_1",
@@ -514,6 +531,208 @@ test("watchdog backs off when stop is accepted but not yet verified", async () =
     assert.equal(gateway.stopCalls, 2);
     assert.equal(confirmed.session.phase, "stopped");
     assert.equal(confirmed.session.stopConfirmedAt, clock.toISOString());
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("idle watchdog waits for running and queued jobs before stopping", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    let workload: RunpodWorkloadSnapshot = {
+      runningJobCount: 1,
+      queuedJobCount: 0,
+      lastActivityAt: clock.toISOString(),
+      idleMinutes: 5,
+    };
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => clock,
+      workerProbe: async () => true,
+      workload: { snapshot: async () => structuredClone(workload) },
+    });
+    await controller.start({
+      operationId: "operation_idle_start_01",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    await controller.reconcile();
+
+    clock = new Date("2026-09-21T01:06:00.000Z");
+    const running = await controller.runWatchdog();
+    assert.equal(running.session.runningJobCount, 1);
+    assert.equal(running.session.idleDeadline, null);
+    assert.equal(gateway.stopCalls, 0);
+
+    workload = {
+      runningJobCount: 0,
+      queuedJobCount: 1,
+      lastActivityAt: "2026-09-21T01:06:00.000Z",
+      idleMinutes: 5,
+    };
+    clock = new Date("2026-09-21T01:08:00.000Z");
+    const queued = await controller.runWatchdog();
+    assert.equal(queued.session.queuedJobCount, 1);
+    assert.equal(queued.session.idleDeadline, null);
+    assert.equal(gateway.stopCalls, 0);
+
+    workload = {
+      runningJobCount: 0,
+      queuedJobCount: 0,
+      lastActivityAt: "2026-09-21T01:08:00.000Z",
+      idleMinutes: 5,
+    };
+    const idle = await controller.syncWorkload();
+    assert.equal(idle.session.idleDeadline, "2026-09-21T01:13:00.000Z");
+    clock = new Date("2026-09-21T01:12:59.000Z");
+    await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 0);
+
+    clock = new Date("2026-09-21T01:13:01.000Z");
+    const stopped = await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 1);
+    assert.equal(stopped.session.phase, "stopped");
+    assert.equal(stopped.session.stopReason, "idle_deadline");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("hard deadline stops a session even while a job is running", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => clock,
+      workload: idleWorkload({
+        runningJobCount: 1,
+        lastActivityAt: clock.toISOString(),
+        idleMinutes: 5,
+      }),
+    });
+    await controller.start({
+      operationId: "operation_hard_busy_01",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    await controller.syncWorkload();
+    clock = new Date("2026-09-21T01:30:01.000Z");
+
+    const stopped = await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 1);
+    assert.equal(stopped.session.phase, "stopped");
+    assert.equal(stopped.session.runningJobCount, 1);
+    assert.equal(stopped.session.stopReason, "hard_deadline");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("hard deadline does not depend on the workload snapshot", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => clock,
+      workload: {
+        snapshot: async () => {
+          throw new Error("workload unavailable");
+        },
+      },
+    });
+    await controller.start({
+      operationId: "operation_hard_unavailable_01",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    clock = new Date("2026-09-21T01:30:01.000Z");
+
+    const stopped = await controller.runWatchdog();
+    assert.equal(gateway.stopCalls, 1);
+    assert.equal(stopped.session.phase, "stopped");
+    assert.equal(stopped.session.stopReason, "hard_deadline");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("deadline extension is atomic, idempotent, and bounded by hard cost", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+      workerProbe: async () => true,
+    });
+    await controller.start({
+      operationId: "operation_extend_start",
+      profileId: "3090",
+      durationMinutes: 60,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    await controller.reconcile();
+
+    const firstInput = {
+      operationId: "operation_extend_0001",
+      additionalMinutes: 30,
+    };
+    const first = await controller.extend(firstInput);
+    assert.equal(first.session.hardDeadline, "2026-09-21T02:30:00.000Z");
+    const repeated = await controller.extend(firstInput);
+    assert.equal(repeated.session.hardDeadline, first.session.hardDeadline);
+    assert.equal(
+      repeated.operations.filter((operation) => operation.kind === "extend")
+        .length,
+      1,
+    );
+    assert.equal(
+      repeated.operations.find((operation) => operation.kind === "extend")
+        ?.mutationAttemptedAt,
+      null,
+    );
+
+    const second = await controller.extend({
+      operationId: "operation_extend_0002",
+      additionalMinutes: 30,
+    });
+    assert.equal(second.session.hardDeadline, "2026-09-21T03:00:00.000Z");
+    await assert.rejects(
+      controller.extend({
+        operationId: "operation_extend_0003",
+        additionalMinutes: 30,
+      }),
+      /hard cost limit/,
+    );
+    assert.equal(
+      (await store.read()).session.hardDeadline,
+      "2026-09-21T03:00:00.000Z",
+    );
   } finally {
     await removeTemporary(directory);
   }

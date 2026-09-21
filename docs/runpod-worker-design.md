@@ -25,6 +25,8 @@ Kerangka operasi tulis sudah diimplementasikan dan diuji tanpa akun berbayar:
 - Create memerlukan image digest, satu GPU, minimum CUDA 12.8, container disk 20 GB, serta Standard Network Volume di `/workspace`. Ia memeriksa cloud, data center, ketersediaan, batas harga UI, dan hard cost limit sebelum mutation.
 - Resume hanya memakai satu Pod terkelola yang cocok dengan image immutable. Pod akun lain atau lebih dari satu Pod terkelola menghentikan operasi untuk pemeriksaan manual.
 - Stop dibedakan dari terminate. Sesi baru dianggap berhenti setelah RunPod melaporkan `EXITED` atau `TERMINATED`; respons stop yang masih aktif menghasilkan backoff dan retry terbatas.
+- Watchdog membaca state job aplikasi. Job `running` atau `queued` menghapus idle deadline; antrean kosong menetapkan deadline dari aktivitas terakhir. Hard deadline dievaluasi lebih dahulu dan tidak bergantung pada snapshot workload.
+- Perpanjangan 30 menit memakai operation ID, lease, dan transaksi state yang sama untuk memperbarui hard deadline. Operasi ditolak jika sesi tidak `ready`, deadline telah lewat, durasi maksimum terlampaui, atau estimasi compute melebihi hard cost limit.
 - `GET/POST /api/v1/runpod/control` dilindungi autentikasi studio dan same-origin guard. Web UI hanya menampilkan status kunci dan belum menyediakan tombol mutation.
 
 Seluruh jalur di atas telah diuji dengan fake RunPod. Key aktual masih baca saja, `RUNPOD_WRITE_ENABLED=false`, data center dan volume ID belum diisi, serta akun tetap memiliki nol Pod. Watchdog sudah tersedia sebagai `npm run runpod:watchdog`, memakai file lock lintas proses dan template timer satu menit. Pengawas belum dideploy pada layanan cloud yang selalu aktif, jadi pengujian lokal belum memenuhi jaminan shutdown ketika PC mati. Rincian operasional ada di [runbook watchdog](runpod-watchdog.md).
@@ -67,13 +69,15 @@ Setiap operasi memakai operation/idempotency ID. Retry dengan ID sama harus memb
 
 ## Hard deadline dan idle shutdown
 
-Pengawas cloud memindai sesi yang belum terminal. Ia memperoleh lease singkat per sesi, membaca waktu server, lalu:
+Controller watchdog lokal memindai sesi yang belum terminal, membaca waktu server, lalu:
 
-- pada hard deadline: berhenti menerima pekerjaan baru, minta pembatalan pekerjaan aktif, lalu jalankan stop;
-- pada idle deadline: stop hanya jika antrean kosong dan worker memastikan tidak ada pekerjaan berjalan;
+- pada hard deadline: jalankan stop walaupun ada pekerjaan aktif atau pembacaan workload gagal;
+- pada idle deadline: sinkronkan job backend dan stop hanya jika antrean serta pekerjaan berjalan kosong;
 - setelah permintaan stop: poll API RunPod sampai status terverifikasi berhenti;
 - jika stop gagal: simpan error, retry terbatas dengan exponential backoff dan jitter, lalu tampilkan peringatan yang membutuhkan tindakan pengguna;
-- perpanjangan sesi: transaksi harus memperbarui deadline cloud sebelum UI menampilkan waktu baru.
+- perpanjangan sesi: perbarui deadline serta operation ID secara atomik sebelum UI menampilkan waktu baru.
+
+Penghentian penerimaan job baru dan pembatalan job worker saat hard deadline mendekat masih harus diimplementasikan. Watchdog juga masih harus dideploy pada host cloud yang selalu aktif sebelum disebut sebagai pengaman biaya operasional.
 
 Timer habis bukan bukti biaya berhenti. Hanya status RunPod yang diverifikasi dan dicatat bersama timestamp yang menutup sesi.
 

@@ -5,6 +5,7 @@ import type {
   RunpodControlState,
   RunpodControlStatus,
   RunpodOperationKind,
+  RunpodStopReason,
 } from "../lib/runpod-control-types.ts";
 import type {
   RunpodCloud,
@@ -24,6 +25,7 @@ import {
   emptyRunpodControlSession,
   runpodControlStore,
 } from "./runpod-control-store.ts";
+import { appStore } from "./store.ts";
 
 const MANAGED_POD_PREFIX = "voxcpm-studio-";
 const MAX_STOP_FAILURES = 3;
@@ -57,6 +59,23 @@ export interface RunpodStartInput {
 export interface RunpodStopInput {
   operationId: string;
   kind?: "stop" | "watchdog-stop";
+  reason?: RunpodStopReason;
+}
+
+export interface RunpodExtendInput {
+  operationId: string;
+  additionalMinutes: number;
+}
+
+export interface RunpodWorkloadSnapshot {
+  runningJobCount: number;
+  queuedJobCount: number;
+  lastActivityAt: string | null;
+  idleMinutes: number;
+}
+
+export interface RunpodWorkloadReader {
+  snapshot(): Promise<RunpodWorkloadSnapshot>;
 }
 
 interface CatalogReader {
@@ -70,7 +89,27 @@ interface RunpodControllerDependencies {
   config?: RunpodControllerConfig;
   now?: () => Date;
   workerProbe?: (podId: string) => Promise<boolean>;
+  workload?: RunpodWorkloadReader;
 }
+
+const appStoreWorkloadReader: RunpodWorkloadReader = {
+  async snapshot() {
+    const state = await appStore.read();
+    const timestamps = state.jobs
+      .map((job) => Date.parse(job.updatedAt))
+      .filter(Number.isFinite);
+    return {
+      runningJobCount: state.jobs.filter((job) => job.status === "running")
+        .length,
+      queuedJobCount: state.jobs.filter((job) => job.status === "queued")
+        .length,
+      lastActivityAt: timestamps.length
+        ? new Date(Math.max(...timestamps)).toISOString()
+        : null,
+      idleMinutes: state.settings.idleMinutes,
+    };
+  },
+};
 
 function defaultConfig(): RunpodControllerConfig {
   const cloud = serverConfig.runpodCloud.toLowerCase();
@@ -149,6 +188,7 @@ export class RunpodController {
   private readonly config: RunpodControllerConfig;
   private readonly now: () => Date;
   private readonly workerProbe: (podId: string) => Promise<boolean>;
+  private readonly workload: RunpodWorkloadReader;
 
   constructor(dependencies: RunpodControllerDependencies = {}) {
     this.store = dependencies.store ?? runpodControlStore;
@@ -157,6 +197,7 @@ export class RunpodController {
     this.config = dependencies.config ?? defaultConfig();
     this.now = dependencies.now ?? (() => new Date());
     this.workerProbe = dependencies.workerProbe ?? defaultWorkerProbe;
+    this.workload = dependencies.workload ?? appStoreWorkloadReader;
   }
 
   private writeConfigurationErrors(): string[] {
@@ -233,6 +274,8 @@ export class RunpodController {
         singleReplicaRequired: true,
         reconcileBeforeCreate: true,
         hardDeadline: true,
+        workloadAwareIdleDeadline: true,
+        atomicDeadlineExtension: true,
         verifiedStopRequired: true,
         terminateImplemented: false,
         cloudWatchdogDeployed: false,
@@ -275,6 +318,51 @@ export class RunpodController {
     }
   }
 
+  async syncWorkload(): Promise<RunpodControlState> {
+    const workload = await this.workload.snapshot();
+    if (
+      !Number.isInteger(workload.runningJobCount) ||
+      workload.runningJobCount < 0 ||
+      !Number.isInteger(workload.queuedJobCount) ||
+      workload.queuedJobCount < 0 ||
+      ![5, 10, 15, 30].includes(workload.idleMinutes)
+    )
+      throw new ApiError(502, "The workload snapshot is invalid.");
+    const parsedActivity = workload.lastActivityAt
+      ? Date.parse(workload.lastActivityAt)
+      : Number.NaN;
+    if (workload.lastActivityAt && !Number.isFinite(parsedActivity))
+      throw new ApiError(502, "The workload activity timestamp is invalid.");
+    const now = this.now();
+    await this.store.mutate((state) => {
+      state.session.runningJobCount = workload.runningJobCount;
+      state.session.queuedJobCount = workload.queuedJobCount;
+      state.session.lastActivityAt = workload.lastActivityAt;
+      state.session.workloadSyncedAt = now.toISOString();
+      state.session.idleMinutes = workload.idleMinutes;
+      const busy = workload.runningJobCount + workload.queuedJobCount > 0;
+      if (state.session.phase !== "ready" || busy) {
+        state.session.idleDeadline = null;
+        return;
+      }
+      const candidates = [
+        state.session.startedAt,
+        state.session.readyAt,
+        workload.lastActivityAt,
+      ]
+        .map((value) => (value ? Date.parse(value) : Number.NaN))
+        .filter(Number.isFinite)
+        .map((value) => Math.min(value, now.getTime()));
+      const baseline = candidates.length
+        ? Math.max(...candidates)
+        : now.getTime();
+      state.session.idleDeadline = new Date(
+        baseline + workload.idleMinutes * 60_000,
+      ).toISOString();
+    });
+    return await this.store.read();
+  }
+
   private matchingOperation(
     state: RunpodControlState,
     id: string,
@@ -309,6 +397,76 @@ export class RunpodController {
       input.maximumHourlyRate > 10
     )
       throw new ApiError(422, "The RunPod hourly rate limit is invalid.");
+  }
+
+  async extend(input: RunpodExtendInput): Promise<RunpodControlState> {
+    this.assertWriteConfiguration();
+    if (!validOperationId(input.operationId))
+      throw new ApiError(422, "The RunPod idempotency key is invalid.");
+    if (input.additionalMinutes !== 30)
+      throw new ApiError(
+        422,
+        "A RunPod session can only be extended by 30 minutes at a time.",
+      );
+    const hash = requestHash({
+      action: "extend",
+      additionalMinutes: input.additionalMinutes,
+    });
+    return this.withLease(async () => {
+      const initial = await this.store.read();
+      const existing = this.matchingOperation(
+        initial,
+        input.operationId,
+        "extend",
+        hash,
+      );
+      if (existing?.status === "succeeded") return initial;
+      if (
+        initial.session.phase !== "ready" ||
+        !initial.session.startedAt ||
+        !initial.session.hardDeadline ||
+        initial.session.hourlyRate === null
+      )
+        throw new ApiError(409, "No ready RunPod session can be extended.");
+      const startedAt = Date.parse(initial.session.startedAt);
+      const currentDeadline = Date.parse(initial.session.hardDeadline);
+      if (
+        !Number.isFinite(startedAt) ||
+        !Number.isFinite(currentDeadline) ||
+        currentDeadline <= this.now().getTime()
+      )
+        throw new ApiError(409, "The RunPod session deadline already passed.");
+      const nextDeadline = currentDeadline + input.additionalMinutes * 60_000;
+      const maximumDeadline =
+        startedAt + this.config.maximumSessionMinutes * 60_000;
+      if (nextDeadline > maximumDeadline)
+        throw new ApiError(
+          409,
+          "The RunPod session already reached its maximum duration.",
+        );
+      const estimatedComputeCost =
+        (initial.session.hourlyRate * (nextDeadline - startedAt)) / 3_600_000;
+      if (estimatedComputeCost > this.config.hardCostLimitUsd)
+        throw new ApiError(
+          409,
+          "The extended session would exceed the hard cost limit.",
+        );
+      const timestamp = this.now().toISOString();
+      await this.store.mutate((state) => {
+        state.session.hardDeadline = new Date(nextDeadline).toISOString();
+        upsertOperation(state, {
+          id: input.operationId,
+          kind: "extend",
+          requestHash: hash,
+          status: "succeeded",
+          createdAt: existing?.createdAt ?? timestamp,
+          updatedAt: timestamp,
+          mutationAttemptedAt: null,
+          error: null,
+        });
+      });
+      return await this.store.read();
+    });
   }
 
   async start(input: RunpodStartInput): Promise<RunpodControlState> {
@@ -507,10 +665,11 @@ export class RunpodController {
     let workerReady = false;
     if (pod.status === "RUNNING" && initial.session.phase !== "stopping")
       workerReady = await this.workerProbe(pod.id);
+    const verifiedAt = this.now().toISOString();
     await this.store.mutate((state) => {
       state.session.podId = pod.id;
       state.session.podName = pod.name;
-      state.session.lastVerifiedAt = this.now().toISOString();
+      state.session.lastVerifiedAt = verifiedAt;
       state.session.workerReady = workerReady;
       if (isStopped(pod)) {
         state.session.phase = "stopped";
@@ -528,6 +687,8 @@ export class RunpodController {
           }
         }
       } else if (pod.status === "RUNNING") {
+        if (workerReady && !state.session.readyAt)
+          state.session.readyAt = verifiedAt;
         state.session.phase =
           state.session.phase === "stopping"
             ? "stopping"
@@ -597,7 +758,8 @@ export class RunpodController {
     if (!validOperationId(input.operationId))
       throw new ApiError(422, "The RunPod idempotency key is invalid.");
     const kind = input.kind ?? "stop";
-    const hash = requestHash({ action: "stop", kind });
+    const reason = input.reason ?? "manual";
+    const hash = requestHash({ action: "stop", kind, reason });
     return this.withLease(async () => {
       const initial = await this.store.read();
       const existing = this.matchingOperation(
@@ -634,6 +796,7 @@ export class RunpodController {
             }
             current.session.phase = pod ? "stopped" : "off";
             current.session.stopConfirmedAt = this.now().toISOString();
+            current.session.stopReason = reason;
             current.session.lastVerifiedAt = this.now().toISOString();
             current.session.nextRetryAt = null;
             current.session.message = pod
@@ -655,6 +818,7 @@ export class RunpodController {
         await this.store.mutate((current) => {
           current.session.phase = "stopping";
           current.session.stopRequestedAt = this.now().toISOString();
+          current.session.stopReason = reason;
           current.session.message = "RunPod stop was requested.";
         });
         await this.markMutationAttempted(input.operationId);
@@ -703,30 +867,48 @@ export class RunpodController {
   }
 
   async runWatchdog(): Promise<RunpodControlState> {
-    const state = await this.store.read();
+    let state = await this.store.read();
     if (!this.config.writeEnabled) return state;
     if (
       !state.session.podId ||
-      !state.session.hardDeadline ||
       ["off", "stopped"].includes(state.session.phase) ||
       state.session.retryCount >= MAX_STOP_FAILURES
     )
       return state;
     const now = this.now().getTime();
-    const deadlineReached = Date.parse(state.session.hardDeadline) <= now;
+    const hardDeadlineReached =
+      state.session.hardDeadline !== null &&
+      Date.parse(state.session.hardDeadline) <= now;
     const retryDue =
       state.session.nextRetryAt !== null &&
       Date.parse(state.session.nextRetryAt) <= now;
-    const shouldStop =
-      state.session.retryCount > 0 ? retryDue : deadlineReached;
-    if (!shouldStop) return state;
+    if (state.session.retryCount > 0 && !retryDue) return state;
+    let reason: RunpodStopReason;
+    if (state.session.retryCount > 0)
+      reason = state.session.stopReason ?? "hard_deadline";
+    else if (hardDeadlineReached) reason = "hard_deadline";
+    else {
+      state = await this.syncWorkload();
+      const idleDeadlineReached =
+        state.session.idleDeadline !== null &&
+        state.session.runningJobCount === 0 &&
+        state.session.queuedJobCount === 0 &&
+        Date.parse(state.session.idleDeadline) <= now;
+      if (!idleDeadlineReached) return state;
+      reason = "idle_deadline";
+    }
     const identity = requestHash({
-      deadline: state.session.hardDeadline,
+      deadline:
+        reason === "hard_deadline"
+          ? state.session.hardDeadline
+          : state.session.idleDeadline,
+      reason,
       retry: state.session.retryCount,
     }).slice(0, 24);
     return this.stop({
       operationId: `watchdog_${identity}`,
       kind: "watchdog-stop",
+      reason,
     });
   }
 }

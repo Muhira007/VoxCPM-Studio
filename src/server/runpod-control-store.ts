@@ -39,10 +39,17 @@ export function emptyRunpodControlSession(): RunpodControlSession {
     networkVolumeId: null,
     hourlyRate: null,
     startedAt: null,
+    readyAt: null,
     hardDeadline: null,
     idleDeadline: null,
+    idleMinutes: 10,
+    runningJobCount: 0,
+    queuedJobCount: 0,
+    lastActivityAt: null,
+    workloadSyncedAt: null,
     stopRequestedAt: null,
     stopConfirmedAt: null,
+    stopReason: null,
     lastVerifiedAt: null,
     workerReady: false,
     retryCount: 0,
@@ -70,6 +77,17 @@ function isState(value: unknown): value is RunpodControlState {
     Boolean(state.session && typeof state.session === "object") &&
     Array.isArray(state.operations)
   );
+}
+
+function normalizeState(state: RunpodControlState): RunpodControlState {
+  return {
+    ...state,
+    session: { ...emptyRunpodControlSession(), ...state.session },
+    operations: state.operations.map((operation) => ({
+      ...operation,
+      mutationAttemptedAt: operation.mutationAttemptedAt ?? null,
+    })),
+  };
 }
 
 export class RunpodControlStore {
@@ -119,7 +137,7 @@ export class RunpodControlStore {
     const parsed: unknown = JSON.parse(await readFile(this.stateFile, "utf8"));
     if (!isState(parsed))
       throw new Error("RunPod control state has an unsupported format.");
-    return structuredClone(parsed);
+    return structuredClone(normalizeState(parsed));
   }
 
   async mutate<T>(

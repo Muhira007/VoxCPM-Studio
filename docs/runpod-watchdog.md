@@ -1,6 +1,6 @@
 # RunPod watchdog scheduler
 
-Watchdog sudah dikemas sebagai command sekali jalan. Command membaca state persisten, memeriksa hard deadline atau retry yang sudah jatuh tempo, lalu keluar. Ia tidak membuat loop sendiri sehingga platform scheduler dapat mengatur cadence, timeout, restart, dan alert.
+Watchdog sudah dikemas sebagai command sekali jalan. Command membaca state persisten, memeriksa hard deadline atau retry yang sudah jatuh tempo, lalu membaca snapshot job backend untuk keputusan idle shutdown. Ia tidak membuat loop sendiri sehingga platform scheduler dapat mengatur cadence, timeout, restart, dan alert.
 
 ```bash
 npm run runpod:watchdog
@@ -9,10 +9,20 @@ npm run runpod:watchdog
 Dengan konfigurasi repository saat ini, hasilnya adalah JSON seperti berikut dan tidak ada request mutation:
 
 ```json
-{"ok":true,"action":"skipped_writes_disabled","phase":"off"}
+{ "ok": true, "action": "skipped_writes_disabled", "phase": "off" }
 ```
 
-Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan yang jatuh tempo. Exit code nonzero harus memicu alert operator. Output tidak memuat API key, worker key, teks pengguna, atau audio.
+Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan yang jatuh tempo. Exit code nonzero harus memicu alert operator. Output memuat hard/idle deadline, jumlah job running/queued, retry, dan alasan stop tanpa API key, worker key, teks pengguna, atau audio.
+
+## Urutan keputusan deadline
+
+1. Hard deadline selalu diperiksa lebih dahulu dan tetap meminta stop ketika job aktif atau snapshot workload gagal.
+2. Retry stop yang sudah jatuh tempo melanjutkan alasan stop sebelumnya tanpa menunggu snapshot baru.
+3. Idle deadline hanya dihitung ketika fase worker `ready` serta tidak ada job `running` atau `queued`.
+4. Aktivitas job terakhir, waktu mulai, dan waktu worker siap menjadi dasar idle deadline. Aktivitas baru menggeser deadline; job aktif menghapusnya.
+5. Perpanjangan sesi hanya menerima tambahan 30 menit melalui `POST /api/v1/runpod/control` dengan `Idempotency-Key`. Deadline dan catatan operasi berubah dalam satu transaksi state, lalu tetap dibatasi durasi maksimum dan hard cost limit.
+
+Pembatalan job aktif sebelum hard deadline belum dihubungkan ke worker. Controller akan tetap memilih batas biaya dan meminta stop saat hard deadline tercapai; kebijakan drain/cancel job adalah langkah berikutnya sebelum pengujian GPU nyata.
 
 ## Model deployment yang dipilih
 

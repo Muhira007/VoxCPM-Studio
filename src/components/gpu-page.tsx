@@ -328,7 +328,10 @@ export function GpuPage() {
                         {runpodControl.limits.hardCostLimitUsd.toFixed(2)}
                       </strong>
                       <small>
-                        Idempotency, lease, reconcile, dan retry stop
+                        Idle {runpodControl.session.idleMinutes} menit ·{" "}
+                        {runpodControl.session.runningJobCount +
+                          runpodControl.session.queuedJobCount}{" "}
+                        job aktif/antri
                       </small>
                     </div>
                     <div>

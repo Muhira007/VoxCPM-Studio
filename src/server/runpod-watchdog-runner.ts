@@ -17,9 +17,13 @@ export interface RunpodWatchdogSummary {
   phase: RunpodControlState["session"]["phase"];
   podId: string | null;
   hardDeadline: string | null;
+  idleDeadline: string | null;
+  runningJobCount: number;
+  queuedJobCount: number;
   retryCount: number;
   nextRetryAt: string | null;
   stopConfirmedAt: string | null;
+  stopReason: RunpodControlState["session"]["stopReason"];
 }
 
 interface WatchdogController {
@@ -56,8 +60,12 @@ export async function runRunpodWatchdogOnce(
     phase: after.session.phase,
     podId: after.session.podId,
     hardDeadline: after.session.hardDeadline,
+    idleDeadline: after.session.idleDeadline,
+    runningJobCount: after.session.runningJobCount,
+    queuedJobCount: after.session.queuedJobCount,
     retryCount: after.session.retryCount,
     nextRetryAt: after.session.nextRetryAt,
     stopConfirmedAt: after.session.stopConfirmedAt,
+    stopReason: after.session.stopReason,
   };
 }

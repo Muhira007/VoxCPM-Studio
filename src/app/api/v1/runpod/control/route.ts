@@ -68,6 +68,17 @@ export async function POST(request: Request) {
         }),
       });
     }
+    if (action === "extend") {
+      const allowed = new Set(["action", "additionalMinutes"]);
+      if (Object.keys(input).some((key) => !allowed.has(key)))
+        throw new ApiError(422, "Extend input contains an unsupported field.");
+      return NextResponse.json({
+        state: await runpodController.extend({
+          operationId: operationId(request),
+          additionalMinutes: Number(input.additionalMinutes),
+        }),
+      });
+    }
     if (action === "start") {
       const allowed = new Set([
         "action",

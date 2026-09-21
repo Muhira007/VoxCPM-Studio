@@ -11,8 +11,9 @@ export type RunpodControlPhase =
   | "stopped"
   | "error";
 
-export type RunpodOperationKind = "start" | "stop" | "watchdog-stop";
+export type RunpodOperationKind = "start" | "extend" | "stop" | "watchdog-stop";
 export type RunpodOperationStatus = "pending" | "succeeded" | "failed";
+export type RunpodStopReason = "manual" | "hard_deadline" | "idle_deadline";
 
 export interface RunpodControlSession {
   phase: RunpodControlPhase;
@@ -25,10 +26,17 @@ export interface RunpodControlSession {
   networkVolumeId: string | null;
   hourlyRate: number | null;
   startedAt: string | null;
+  readyAt: string | null;
   hardDeadline: string | null;
   idleDeadline: string | null;
+  idleMinutes: number;
+  runningJobCount: number;
+  queuedJobCount: number;
+  lastActivityAt: string | null;
+  workloadSyncedAt: string | null;
   stopRequestedAt: string | null;
   stopConfirmedAt: string | null;
+  stopReason: RunpodStopReason | null;
   lastVerifiedAt: string | null;
   workerReady: boolean;
   retryCount: number;
@@ -82,6 +90,8 @@ export interface RunpodControlStatus {
     singleReplicaRequired: true;
     reconcileBeforeCreate: true;
     hardDeadline: true;
+    workloadAwareIdleDeadline: true;
+    atomicDeadlineExtension: true;
     verifiedStopRequired: true;
     terminateImplemented: false;
     cloudWatchdogDeployed: false;

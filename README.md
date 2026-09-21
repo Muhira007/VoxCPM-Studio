@@ -27,19 +27,19 @@ Perintah di atas menjalankan frontend demo. Untuk memakai Web UI melalui API apl
 
 Panel RunPod baca saja tersedia dalam mode API bila `RUNPOD_API_KEY` berisi key `Restricted` yang hanya mempunyai izin baca. Salin konfigurasi non-rahasia dari `.env.example`, simpan key asli hanya di `.env.local`, dan jangan memakai awalan `NEXT_PUBLIC_`. Panel membaca inventaris, dua katalog cloud, harga, dan data center; tombol dry-run hanya menghitung rencana di backend dan tidak membuat Pod. Image worker default dikunci ke digest GHCR yang sudah diterbitkan.
 
-Strategi persisten yang dipilih adalah **Standard Network Volume 30 GB** pada `/workspace`, dengan estimasi storage `$2.10/bulan` berdasarkan `$0.07/GB/bulan`. Volume dan data center aktual belum dibuat atau dipilih. Gateway create/start/stop berada di balik `RUNPOD_WRITE_ENABLED=false`, memakai idempotency ID, lease persisten, rekonsiliasi Pod, batas biaya, hard deadline, retry stop, serta konfirmasi status terminal. Tidak ada operasi terminate. Pengawas deadline sudah diuji dengan fake gateway, tetapi belum dideploy pada layanan cloud yang tetap hidup ketika komputer lokal mati.
+Strategi persisten yang dipilih adalah **Standard Network Volume 30 GB** pada `/workspace`, dengan estimasi storage `$2.10/bulan` berdasarkan `$0.07/GB/bulan`. Volume dan data center aktual belum dibuat atau dipilih. Gateway create/start/stop berada di balik `RUNPOD_WRITE_ENABLED=false`, memakai idempotency ID, lease persisten, rekonsiliasi Pod, batas biaya, hard deadline, retry stop, serta konfirmasi status terminal. Tidak ada operasi terminate. Pengawas membaca antrean dan pekerjaan aktif sebelum idle shutdown; hard deadline tetap berlaku ketika pekerjaan aktif atau pembacaan workload gagal. Pengawas ini sudah diuji dengan fake gateway, tetapi belum dideploy pada layanan cloud yang tetap hidup ketika komputer lokal mati.
 
-Watchdog scheduler dapat dijalankan sekali dengan `npm run runpod:watchdog`. State store memakai file lock lintas proses dan pemulihan lock basi, sehingga aplikasi serta scheduler pada satu host dan persistent directory yang sama tidak menimpa state. Model deployment awal dibatasi ke satu replica; lihat [runbook watchdog](docs/runpod-watchdog.md) dan template systemd di `deploy/systemd/`.
+Watchdog scheduler dapat dijalankan sekali dengan `npm run runpod:watchdog`. State store memakai file lock lintas proses dan pemulihan lock basi, sehingga aplikasi serta scheduler pada satu host dan persistent directory yang sama tidak menimpa state. Perpanjangan 30 menit disimpan atomik dan idempoten, serta ditolak jika melewati durasi maksimum atau hard cost limit. Model deployment awal dibatasi ke satu replica; lihat [runbook watchdog](docs/runpod-watchdog.md) dan template systemd di `deploy/systemd/`.
 
 ## Fitur yang bisa dicoba
 
-| Halaman       | Perilaku saat ini                                                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Studio        | Editor 5.000 karakter, contoh naskah, empat mode, gaya bicara, pemilihan referensi, validasi, progres dan pembatalan demo.                       |
-| Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman.                            |
-| Riwayat       | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah.                                                     |
-| Sesi GPU      | Simulasi provisioning tetap lokal. Panel API menampilkan inventaris, dry-run, strategi storage, batas biaya, dan status kunci operasi cloud.       |
-| Pengaturan    | Durasi, idle timeout, batas harga contoh, skenario normal/gagal, serta reset data lokal.                                                         |
+| Halaman       | Perilaku saat ini                                                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Studio        | Editor 5.000 karakter, contoh naskah, empat mode, gaya bicara, pemilihan referensi, validasi, progres dan pembatalan demo.                                                |
+| Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman.                                                     |
+| Riwayat       | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah.                                                                              |
+| Sesi GPU      | Simulasi provisioning tetap lokal. Panel API menampilkan inventaris, dry-run, storage, batas biaya, idle timeout, jumlah job aktif/antri, dan status kunci operasi cloud. |
+| Pengaturan    | Durasi, idle timeout, batas harga contoh, skenario normal/gagal, serta reset data lokal.                                                                                  |
 
 Urutan mencoba:
 
@@ -75,7 +75,7 @@ npm test
 npm run build
 ```
 
-Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, blocker dry-run, feature lock sebelum jaringan, rekonsiliasi create/resume, deadline, backoff, dan verifikasi stop.
+Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, blocker dry-run, feature lock sebelum jaringan, rekonsiliasi create/resume, deadline berbasis workload, perpanjangan atomik, backoff, dan verifikasi stop.
 
 Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Container simulasi kembali lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
 
@@ -85,7 +85,7 @@ Persiapan Fase 5 memakai API key RunPod `Restricted` dengan akses baca saja. Key
 
 Integrasi baca saja kemudian diverifikasi end-to-end melalui endpoint dan UI: akun berisi `0` Pod, katalog terfilter berisi `48` tipe GPU dan `33` data center, pilihan Community/Secure mengubah harga serta dry-run, dan respons tetap `resourceCreated: false`. Snapshot harga pada 21 September 2026 adalah Community `$0.16/$0.22/$0.34` dan Secure `$0.27/$0.50/$0.74` untuk A5000/RTX 3090/RTX 4090. Ketersediaan berubah antar-permintaan, sehingga angka selalu ditampilkan bersama waktu pengamatan dan dibaca ulang sebelum operasi berbayar. Seluruh pemeriksaan aplikasi publik lulus pada [run 35603569305](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35603569305).
 
-Control plane berikutnya sudah diimplementasikan tanpa mutation nyata. State disimpan atomik di `.data/runpod-control.json`; create/resume/stop memerlukan idempotency key dan lease, selalu merekonsiliasi inventaris, memeriksa harga serta batas biaya, lalu memakai deadline absolut. Fake RunPod membuktikan bahwa retry tidak membuat Pod ganda, hasil create yang timeout tidak dikirim ulang sebelum rekonsiliasi, Pod `EXITED` di-resume, kegagalan stop memakai backoff, dan `stopConfirmedAt` hanya terisi setelah `EXITED` atau `TERMINATED`. Default `RUNPOD_WRITE_ENABLED=false` menolak seluruh `POST` upstream sebelum `fetch` dipanggil.
+Control plane berikutnya sudah diimplementasikan tanpa mutation nyata. State disimpan atomik di `.data/runpod-control.json`; create/resume/stop memerlukan idempotency key dan lease, selalu merekonsiliasi inventaris, memeriksa harga serta batas biaya, lalu memakai deadline absolut. Watchdog menyinkronkan status job backend, meniadakan idle deadline selama ada job running/queued, dan menyimpan alasan stop. Endpoint kontrol juga menerima perpanjangan 30 menit yang atomik dan idempoten. Fake RunPod membuktikan bahwa retry tidak membuat Pod ganda, hasil create yang timeout tidak dikirim ulang sebelum rekonsiliasi, Pod `EXITED` di-resume, hard deadline tidak bergantung pada snapshot workload, kegagalan stop memakai backoff, dan `stopConfirmedAt` hanya terisi setelah `EXITED` atau `TERMINATED`. Default `RUNPOD_WRITE_ENABLED=false` menolak seluruh `POST` upstream sebelum `fetch` dipanggil.
 
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 
@@ -104,7 +104,7 @@ src/lib/fixtures.ts       Naskah, inspirasi, profil GPU, dan label demo
 src/lib/webmcp.ts         Peningkatan opsional untuk browser yang mendukung WebMCP
 src/server/               Persistensi, validasi, autentikasi, dan client worker
 src/server/runpod-client.ts Client REST API v2 GET-only dan planner lokal
-src/server/runpod-controller.ts State machine, lease, deadline, dan rekonsiliasi Pod
+src/server/runpod-controller.ts State machine, lease, workload, deadline, dan rekonsiliasi Pod
 src/server/runpod-control-gateway.ts Gateway create/start/stop dengan feature lock
 src/server/runpod-watchdog-runner.ts Ringkasan eksekusi watchdog sekali jalan
 src/app/api/v1/           Route Handler API aplikasi
