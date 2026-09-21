@@ -1,6 +1,12 @@
 ARG RUNPOD_BASE_IMAGE=runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 FROM ${RUNPOD_BASE_IMAGE}
 
+ARG VCS_REF=unknown
+
+LABEL org.opencontainers.image.source="https://github.com/Muhira007/VoxCPM-Studio" \
+      org.opencontainers.image.description="Pinned VoxCPM2 GPU worker for VoxCPM Studio" \
+      org.opencontainers.image.revision="${VCS_REF}"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     WORKER_MODE=voxcpm2 \

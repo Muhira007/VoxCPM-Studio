@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: worker-gpu-image-${{ github.ref }}
@@ -47,7 +48,12 @@ jobs:
           df -h /
 
       - name: Build pinned GPU worker image
-        run: docker build --file worker/Dockerfile.gpu --tag voxcpm-worker:gpu worker
+        run: |
+          docker build \
+            --build-arg "VCS_REF=${GITHUB_SHA}" \
+            --file worker/Dockerfile.gpu \
+            --tag voxcpm-worker:gpu \
+            worker
 
       - name: Validate packages and fail-closed startup
         shell: bash
@@ -73,3 +79,31 @@ jobs:
           image_env="$(docker image inspect voxcpm-worker:gpu --format '{{json .Config.Env}}')"
           grep --fixed-strings 'WORKER_MODE=voxcpm2' <<< "${image_env}"
           grep --fixed-strings 'WORKER_MODEL_REVISION=32279effe8c19989596f05d353d1447f51d9e915' <<< "${image_env}"
+
+      - name: Publish immutable image to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/voxcpm-studio-worker"
+          tag="sha-${GITHUB_SHA}"
+          image_ref="${image}:${tag}"
+
+          echo "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          docker tag voxcpm-worker:gpu "${image_ref}"
+
+          push_output="$(docker push "${image_ref}" 2>&1 | tee /dev/stderr)"
+          digest="$(sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' <<< "${push_output}" | tail -n 1)"
+          test -n "${digest}"
+
+          {
+            echo "## Published GPU worker"
+            echo
+            echo "- Tag: \`${image_ref}\`"
+            echo "- Digest: \`${image}@${digest}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          docker logout ghcr.io
