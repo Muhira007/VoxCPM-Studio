@@ -203,6 +203,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Browser berhasil membuka Mode API Lokal tanpa menerima `STUDIO_API_KEY`, menyiapkan worker, membuat pekerjaan, dan berpindah dari `queued` ke `succeeded` melalui polling endpoint detail.
 - Integrasi browser ↔ Next.js ↔ FastAPI lulus untuk sesi, pekerjaan tanpa audio palsu, unggah/baca ulang WAV 44 byte, edit metadata suara, reset backend, dan logout.
 - 22/22 pengujian Node lulus, termasuk token kedaluwarsa/tamper, origin guard, sesi browser kedaluwarsa, receiver `fetch`, pemetaan adapter, serta polling status. TypeScript, ESLint, dan build produksi mode API lulus.
+- [GitHub Actions run 35566625556](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35566625556) lulus pada runner Ubuntu dengan Node.js 24: instalasi bersih, 22/22 pengujian Node, pemeriksaan TypeScript, ESLint, dan build produksi.
 - Data integrasi direset, dua proses pengujian dihentikan, dan `.env.local` berisi rahasia uji dihapus setelah pemeriksaan.
 
 **Batas saat ini:** autentikasi ini ditujukan untuk aplikasi pribadi satu pengguna. Sesi bersifat stateless; mengganti `STUDIO_SESSION_SECRET` membatalkan cookie lama. Worker tetap mode simulasi dan belum memuat VoxCPM2/CUDA.
@@ -299,7 +300,7 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 20 September 2026 | Fase 3 selesai: service simulasi, persistensi lokal, skenario kegagalan, dan pembatalan. | 12/12 pengujian otomatis; alur WAV → cloning demo → riwayat, refresh, edit/hapus, dan reset diverifikasi. | Backend/worker lokal pada Fase 4 belum dikerjakan; saldo RunPod belum diperlukan untuk fase tersebut. |
 | 21 September 2026 | API Next.js, penyimpanan server, worker FastAPI simulasi, Dockerfile, dan rancangan kontrol cloud ditambahkan. | 15/15 tes Node, 4/4 tes worker, lint, TypeScript, build Next.js, serta integrasi dua proses lulus. | Docker tidak tersedia sehingga image belum dibangun. Web UI belum dialihkan ke API agar kunci backend tidak bocor ke browser. |
 | 21 September 2026 | Fase 4 selesai melalui validasi container di GitHub Actions tanpa memakai RunPod. | Image berhasil dibangun; container non-root, autentikasi, simulasi, restart/persistensi, dan Docker health check lulus pada run 35540568742. | Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah autentikasi sesi `HttpOnly` dan adapter API Web UI secara lokal sambil menunggu prasyarat Fase 5. |
-| 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
+| 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus; CI publik tercatat pada run 35566625556. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
 
 ## 14. Langkah pengerjaan berikutnya
 
