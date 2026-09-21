@@ -52,13 +52,24 @@ docker build --platform linux/amd64 `
 
 Build tidak mengunduh bobot model dan tidak membutuhkan GPU. Workflow `.github/workflows/worker-gpu-image.yml` menjalankan build yang sama di GitHub Actions, memeriksa package, memastikan proses turun ke UID `10001`, dan memastikan startup gagal dengan pesan yang jelas ketika runner tidak memiliki CUDA. Pemeriksaan ini lulus pada [GitHub Actions run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429).
 
+## Image yang diterbitkan
+
+Workflow yang sama menerbitkan image hanya dari branch `main` setelah seluruh pemeriksaan di atas lulus. Publikasi memakai `GITHUB_TOKEN` milik workflow, bukan kredensial RunPod atau personal access token baru.
+
+- Tag commit: `ghcr.io/muhira007/voxcpm-studio-worker:sha-4e61b5fec9e46f359d6cad7e6cfdb7fa497d8427`.
+- Referensi digest yang direkomendasikan: `ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd`.
+- Paket: [voxcpm-studio-worker di GHCR](https://github.com/users/Muhira007/packages/container/package/voxcpm-studio-worker).
+- Workflow: [run 35571278859](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35571278859).
+
+Paket bersifat publik dan tertaut ke repository sumber. Registry API mengembalikan HTTP `200` untuk manifest melalui tag maupun digest tanpa kredensial GitHub. Workflow menolak publikasi bila tag commit sudah ada dan tidak membuat tag `latest`; template deployment tetap harus memakai digest sebagai identitas artefak yang sebenarnya.
+
 ## Konfigurasi template RunPod nanti
 
 Gunakan image registry dengan tag versi atau digest, bukan `latest`. Konfigurasi awal:
 
 | Pengaturan | Nilai awal |
 | --- | --- |
-| Container image | Image hasil `Dockerfile.gpu` dengan tag versi/digest |
+| Container image | `ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd` |
 | Container disk | Sedikitnya 20 GB untuk image dan temporary files |
 | Volume mount | `/workspace` |
 | Volume | Sedikitnya 30 GB untuk model, cache, referensi, dan hasil awal |

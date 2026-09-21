@@ -73,6 +73,8 @@ Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya 
 
 Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Container simulasi kembali lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
 
+Image tervalidasi tersebut telah diterbitkan sebagai [paket GHCR publik](https://github.com/users/Muhira007/packages/container/package/voxcpm-studio-worker) melalui [run 35571278859](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35571278859). Gunakan referensi tetap `ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd`; jangan memakai tag `latest`. Tag commit dilindungi dari overwrite oleh workflow. Manifest tag dan digest telah diuji dengan pull anonim, tetapi image belum dijalankan pada GPU.
+
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 
 ## Struktur kode

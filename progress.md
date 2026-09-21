@@ -244,7 +244,33 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Status fase:** selesai. Seluruh checklist tanpa GPU lulus; inferensi nyata tetap menunggu Fase 5.
 
-## 10. Fase 5 — Integrasi RunPod setelah saldo tersedia
+## 10. Fase 4C — Publikasi image GPU tanpa membuat Pod
+
+- [x] Memberi image label OCI untuk repository sumber, deskripsi, dan commit revision.
+- [x] Membatasi publikasi GHCR ke branch `main` setelah build, preflight package, pemeriksaan UID, dan startup fail-closed lulus.
+- [x] Menerbitkan satu tag immutable berbasis commit tanpa membuat tag `latest`.
+- [x] Mencatat digest registry yang dapat dipakai untuk mengunci image pada template RunPod.
+- [x] Menautkan paket GHCR ke repository sumber dan memastikan visibilitas publik.
+- [x] Memverifikasi tag dan digest melalui Registry API memakai token pull anonim.
+- [x] Menjalankan ulang kontrak container simulasi setelah perubahan Dockerfile.
+
+**Hasil verifikasi Fase 4C, 21 September 2026:**
+
+- Image: `ghcr.io/muhira007/voxcpm-studio-worker:sha-4e61b5fec9e46f359d6cad7e6cfdb7fa497d8427`.
+- Referensi tetap: `ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd`.
+- [GPU worker image run 35571278859](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35571278859) membangun ulang image, mengulang seluruh pemeriksaan Fase 4B, menolak overwrite bila tag commit sudah ada, lalu menerbitkan manifest berukuran 8.908 byte ke GHCR.
+- [Paket GHCR publik](https://github.com/users/Muhira007/packages/container/package/voxcpm-studio-worker) tertaut ke `Muhira007/VoxCPM-Studio`; versi final memakai tag commit di atas.
+- Permintaan anonim untuk manifest melalui tag dan digest sama-sama menghasilkan HTTP `200` dan digest yang identik. RunPod tidak memerlukan kredensial GitHub untuk menarik image ini.
+- [Worker container run 35570024814](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35570024814) memastikan container simulasi dan kontraknya tetap lulus.
+- Tidak ada Pod, volume, model download, inferensi GPU, API key GitHub tambahan, atau biaya RunPod yang dibuat.
+
+**Batas saat ini:** registry membuktikan artefak tersedia dan dapat ditarik, tetapi belum membuktikan kecepatan pull, cold start, kompatibilitas driver GPU host, pemuatan bobot model, atau inferensi nyata.
+
+**Kriteria selesai:** image yang sudah divalidasi tersedia sebagai paket publik, dapat dirujuk dengan tag commit dan digest, serta dapat diambil tanpa kredensial registry. Seluruh kriteria telah lulus.
+
+**Status fase:** selesai.
+
+## 11. Fase 5 — Integrasi RunPod setelah saldo tersedia
 
 **Prasyarat:** saldo tersedia, konfigurasi akun siap, serta batas harga dan durasi pengujian ditetapkan bersama pengguna. Pemeriksaan read-only pada 21 September 2026 menunjukkan saldo `$0,00` dan pemakaian `$0/jam`; belum ada resource berbayar yang dibuat.
 
@@ -271,7 +297,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** kontrol GPU bekerja nyata, data bertahan setelah sesi berakhir, dan shutdown berhasil diuji dengan browser tertutup serta PC pengguna tidak menjalankan pengawas lokal.
 
-## 11. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
+## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
 - [ ] Menguji TTS Indonesia, voice design, cloning dengan gaya, dan Hi-Fi cloning secara terpisah.
@@ -289,7 +315,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Kriteria selesai:** pengguna dapat menghasilkan dan mengunduh audio nyata, mengulang bagian yang bermasalah, serta mengakhiri sesi GPU dengan hasil tersimpan. Kualitas dan biaya dilaporkan dari pengukuran.
 
-## 12. Pengembangan lanjutan — di luar syarat selesai MVP
+## 13. Pengembangan lanjutan — di luar syarat selesai MVP
 
 - [ ] Editor dialog multi-speaker dengan suara dan gaya per segmen.
 - [ ] Perbandingan beberapa kandidat hasil audio.
@@ -299,7 +325,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [ ] Evaluasi vLLM-Omni atau engine lain jika antrean dan kebutuhan throughput membenarkannya.
 - [ ] Migrasi ke Serverless atau multi-user jika pola penggunaan sudah membutuhkan.
 
-## 13. Catatan teknis yang harus dipertahankan
+## 14. Catatan teknis yang harus dipertahankan
 
 1. **Frontend dahulu:** mode demo tidak membuat resource, tidak mengonsumsi saldo, dan tidak mengklaim menghasilkan suara AI nyata.
 2. **Persistensi:** folder source di `/workspace` tidak otomatis membuat seluruh environment Python persisten. Dependensi harus tersedia dalam image atau environment yang sengaja dikelola.
@@ -322,7 +348,7 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 - [Custom template RunPod](https://docs.runpod.io/pods/templates/create-custom-template)
 - [Harga RunPod](https://www.runpod.io/pricing)
 
-## 14. Log progres
+## 15. Log progres
 
 | Tanggal | Hasil | Verifikasi | Kendala / langkah berikutnya |
 | --- | --- | --- | --- |
@@ -334,10 +360,11 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Fase 4 selesai melalui validasi container di GitHub Actions tanpa memakai RunPod. | Image berhasil dibangun; container non-root, autentikasi, simulasi, restart/persistensi, dan Docker health check lulus pada run 35540568742. | Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah autentikasi sesi `HttpOnly` dan adapter API Web UI secara lokal sambil menunggu prasyarat Fase 5. |
 | 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus; CI publik tercatat pada run 35566625556. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
 | 21 September 2026 | Fase 4B selesai: adapter VoxCPM2, transfer referensi/hasil, preflight CUDA, dependency pin, serta image GPU RunPod disiapkan tanpa Pod. | 7/7 tes worker, 22/22 tes Node, build aplikasi dan container simulasi lulus; image GPU dibangun dari nol dan package/fail-closed startup diverifikasi pada run 35568741429. | Image belum diterbitkan ke registry dan belum diuji pada GPU. Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah publikasi image immutable ke registry tanpa membuat Pod. |
+| 21 September 2026 | Fase 4C selesai: image GPU diterbitkan sebagai paket GHCR publik dengan tag commit yang dilindungi dari overwrite dan digest tetap. | Run 35571278859 lulus; manifest tag dan digest dapat diambil anonim dengan HTTP 200, paket tertaut ke repository, dan regresi container simulasi lulus pada run 35570024814. | Image belum diuji pada GPU dan saldo RunPod masih $0,00. Rekomendasi berikutnya adalah membuat API key RunPod Restricted setelah verifikasi dua langkah, menyimpannya hanya di `.env.local`, lalu membangun client kontrol cloud dengan mode dry-run tanpa membuat Pod. |
 
-## 15. Langkah pengerjaan berikutnya
+## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** terbitkan image yang sudah lolos ke GitHub Container Registry dengan tag commit immutable dan catat digest-nya. Langkah ini membuat artefak siap ditarik RunPod tanpa membuat Pod; workflow publikasi harus tetap memisahkan build tervalidasi dari kredensial RunPod.
+**Rekomendasi selama saldo RunPod masih $0,00:** selesaikan verifikasi dua langkah RunPod, buat API key `Restricted` khusus proyek dengan izin minimum, dan simpan hanya pada `.env.local` yang diabaikan Git. Setelah itu, implementasikan client kontrol RunPod beserta validasi konfigurasi, pembacaan inventaris, dan mode dry-run tanpa membuat Pod.
 
 Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 
