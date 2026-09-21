@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -50,6 +50,16 @@ test("application store persists sessions, jobs, and voice metadata atomically",
     assert.equal(state.settings.sessionMinutes, 120);
     const disk = JSON.parse(await readFile(join(directory, "studio-state.json"), "utf8"));
     assert.equal(disk.version, 1);
+  } finally { await removeTemporary(directory); }
+});
+
+test("application store shares first-time initialization across concurrent API reads", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const states = await Promise.all(Array.from({ length: 8 }, () => store.read()));
+    assert.ok(states.every((state) => state.version === 1));
+    const files = await readdir(directory);
+    assert.deepEqual(files.sort(), ["outputs", "references", "studio-state.json"]);
   } finally { await removeTemporary(directory); }
 });
 

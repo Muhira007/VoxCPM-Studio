@@ -24,6 +24,7 @@ export class AppStore {
   readonly outputsDir: string;
   private readonly stateFile: string;
   private initialized = false;
+  private initialization: Promise<void> | null = null;
   private queue: Promise<void> = Promise.resolve();
 
   constructor(dataDir = serverConfig.dataDir) {
@@ -35,6 +36,15 @@ export class AppStore {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    if (!this.initialization) this.initialization = this.initializeOnce();
+    try {
+      await this.initialization;
+    } finally {
+      if (!this.initialized) this.initialization = null;
+    }
+  }
+
+  private async initializeOnce(): Promise<void> {
     await Promise.all([mkdir(this.dataDir, { recursive: true }), mkdir(this.referencesDir, { recursive: true }), mkdir(this.outputsDir, { recursive: true })]);
     try {
       await readFile(this.stateFile, "utf8");

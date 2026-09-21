@@ -4,6 +4,18 @@ Dokumen ini berawal sebagai rancangan Fase 4 dan diperbarui pada persiapan Fase 
 
 Integrasi baru harus memakai REST API v2 di `https://api.runpod.io/v2` dengan header `Authorization: Bearer <key>`. GraphQL hanya dipakai sekali untuk verifikasi kompatibilitas key dan tidak menjadi dasar implementasi karena dokumentasi RunPod menyatakan GraphQL akan dihentikan pada awal 2027. Naikkan izin key ke tulis hanya ketika operasi create/start/stop sudah mempunyai validasi biaya, idempotensi, dan verifikasi status.
 
+## Implementasi baca saja dan dry-run
+
+Tahap baca saja sudah diimplementasikan tanpa membuat resource:
+
+- `src/server/runpod-client.ts` hanya mengirim `GET` ke REST API v2, memakai bearer header di server, timeout 15 detik, pagination inventaris, sanitasi error, dan cache snapshot 30 detik.
+- `GET /api/v1/runpod/overview` membaca seluruh Pod, katalog Community dan Secure yang memenuhi minimum CUDA 12.8, serta katalog data center. Endpoint memerlukan autentikasi studio.
+- `POST /api/v1/runpod/plan` adalah perhitungan lokal terautentikasi. Method `POST` hanya membawa input UI ke backend; client RunPod tetap hanya mengirim `GET` dan respons selalu menandai `resourceCreated: false` serta `mutationAttempted: false`.
+- Planner membandingkan tarif aktual dengan batas pengguna, ketersediaan, data center, inventaris Pod, image digest, container disk 20 GB, dan volume persisten awal 30 GB. Storage yang belum dipilih dan key baca saja selalu menjadi blocker.
+- Panel Sesi GPU menampilkan sumber, waktu snapshot, inventaris, harga, ketersediaan, pilihan Community/Secure, dan estimasi compute. Kontrol sesi yang sudah ada tetap diberi label simulasi lokal.
+
+Verifikasi langsung pada 21 September 2026 menghasilkan `0` Pod, `48` tipe GPU yang lolos filter katalog, dan `33` data center. Harga yang terbaca untuk Community adalah A5000 `$0.16`, RTX 3090 `$0.22`, dan RTX 4090 `$0.34` per jam; Secure adalah `$0.27`, `$0.50`, dan `$0.74`. Ketersediaan berubah antar-snapshot, sehingga semua angka di UI diberi timestamp dan harus dibaca ulang tepat sebelum operasi berbayar. Saldo tidak diklaim oleh client karena endpoint yang dipakai tidak menyediakannya.
+
 ## Kepemilikan state
 
 Next.js bertindak sebagai control plane. Storage persisten menyimpan `podId`, status yang terakhir diverifikasi, batas harga, waktu mulai, `hardDeadline`, `idleDeadline`, pekerjaan, lokasi referensi/hasil, jumlah retry, serta versi state. GPU worker hanya menjalankan pekerjaan dan tidak menjadi sumber kebenaran untuk tagihan atau umur Pod.

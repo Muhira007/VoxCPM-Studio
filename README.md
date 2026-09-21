@@ -1,6 +1,6 @@
 # VoxCPM Studio
 
-Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, worker simulasi, dan container simulasi telah diverifikasi. Paket worker VoxCPM2/CUDA sudah disiapkan, tetapi belum dijalankan pada GPU dan belum menghasilkan audio AI yang terverifikasi.**
+Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, worker simulasi, container simulasi, serta integrasi RunPod REST API v2 baca saja dan dry-run telah diverifikasi. Paket worker VoxCPM2/CUDA sudah disiapkan, tetapi belum dijalankan pada GPU dan belum menghasilkan audio AI yang terverifikasi.**
 
 ## Menjalankan aplikasi
 
@@ -25,15 +25,17 @@ Unduhan paket membutuhkan internet saat instalasi. Font dan ikon disertakan mela
 
 Perintah di atas menjalankan frontend demo. Untuk memakai Web UI melalui API aplikasi dan worker FastAPI lokal, ikuti [panduan backend lokal](docs/backend-api.md). Mode tersebut memakai kata sandi studio, cookie sesi `HttpOnly`, dan dua kunci backend yang berbeda, tetapi tidak membutuhkan akun atau saldo RunPod.
 
+Panel RunPod baca saja tersedia dalam mode API bila `RUNPOD_API_KEY` berisi key `Restricted` yang hanya mempunyai izin baca. Salin konfigurasi non-rahasia dari `.env.example`, simpan key asli hanya di `.env.local`, dan jangan memakai awalan `NEXT_PUBLIC_`. Panel membaca inventaris, dua katalog cloud, harga, dan data center; tombol dry-run hanya menghitung rencana di backend dan tidak membuat Pod. Image worker default dikunci ke digest GHCR yang sudah diterbitkan.
+
 ## Fitur yang bisa dicoba
 
-| Halaman | Perilaku saat ini |
-| --- | --- |
-| Studio | Editor 5.000 karakter, contoh naskah, empat mode, gaya bicara, pemilihan referensi, validasi, progres dan pembatalan demo. |
-| Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman. |
-| Riwayat | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah. |
-| Sesi GPU | Simulasi provisioning, pemuatan model, kesiapan, perpanjangan, dan penghentian sesi. Tarif hanya angka contoh. |
-| Pengaturan | Durasi, idle timeout, batas harga contoh, skenario normal/gagal, serta reset data lokal. |
+| Halaman       | Perilaku saat ini                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Studio        | Editor 5.000 karakter, contoh naskah, empat mode, gaya bicara, pemilihan referensi, validasi, progres dan pembatalan demo.                       |
+| Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman.                            |
+| Riwayat       | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah.                                                     |
+| Sesi GPU      | Simulasi provisioning tetap lokal. Dalam mode API, panel terpisah membaca inventaris dan katalog RunPod serta menghitung dry-run tanpa mutation. |
+| Pengaturan    | Durasi, idle timeout, batas harga contoh, skenario normal/gagal, serta reset data lokal.                                                         |
 
 Urutan mencoba:
 
@@ -69,13 +71,15 @@ npm test
 npm run build
 ```
 
-Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, dan kegagalan simulasi.
+Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, serta blocker dry-run.
 
 Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Container simulasi kembali lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
 
 Image tervalidasi tersebut telah diterbitkan sebagai [paket GHCR publik](https://github.com/users/Muhira007/packages/container/package/voxcpm-studio-worker) melalui [run 35571278859](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35571278859). Gunakan referensi tetap `ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd`; jangan memakai tag `latest`. Tag commit dilindungi dari overwrite oleh workflow. Manifest tag dan digest telah diuji dengan pull anonim, tetapi image belum dijalankan pada GPU.
 
 Persiapan Fase 5 memakai API key RunPod `Restricted` dengan akses baca saja. Key berada hanya di `.env.local` yang diabaikan Git; REST API v2 berhasil mengautentikasi dan mengembalikan inventaris kosong tanpa mutation. GraphQL tidak dipakai untuk client baru karena sudah dijadwalkan berhenti pada awal 2027. Demo tetap berjalan tanpa key atau akun RunPod.
+
+Integrasi baca saja kemudian diverifikasi end-to-end melalui endpoint dan UI: akun berisi `0` Pod, katalog terfilter berisi `48` tipe GPU dan `33` data center, pilihan Community/Secure mengubah harga serta dry-run, dan respons tetap `resourceCreated: false`. Snapshot harga pada 21 September 2026 adalah Community `$0.16/$0.22/$0.34` dan Secure `$0.27/$0.50/$0.74` untuk A5000/RTX 3090/RTX 4090. Ketersediaan berubah antar-permintaan, sehingga angka selalu ditampilkan bersama waktu pengamatan dan dibaca ulang sebelum operasi berbayar.
 
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 
@@ -87,10 +91,12 @@ src/components/           Halaman interaktif dan komponen bersama
 src/lib/types.ts          Kontrak service dan tipe data
 src/lib/demo-service.ts   State machine simulasi, validasi, persistensi metadata
 src/lib/api-service.ts    Adapter browser untuk API lokal dan polling worker
+src/lib/runpod-types.ts   Kontrak publik panel RunPod baca saja dan dry-run
 src/lib/audio-storage.ts  Penyimpanan dan validasi audio di browser
 src/lib/fixtures.ts       Naskah, inspirasi, profil GPU, dan label demo
 src/lib/webmcp.ts         Peningkatan opsional untuk browser yang mendukung WebMCP
 src/server/               Persistensi, validasi, autentikasi, dan client worker
+src/server/runpod-client.ts Client REST API v2 GET-only dan planner lokal
 src/app/api/v1/           Route Handler API aplikasi
 worker/app/               Worker FastAPI mode simulasi dan adapter VoxCPM2
 worker/Dockerfile.gpu     Image GPU RunPod dengan versi model/dependensi terkunci

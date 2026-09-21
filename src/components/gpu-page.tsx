@@ -3,26 +3,61 @@
 import {
   ArrowRight,
   Check,
+  Cloud,
   Clock3,
   Cpu,
+  Database,
   Info,
   LoaderCircle,
+  MapPin,
   Play,
   Plus,
   Power,
+  RefreshCw,
+  Server,
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatTime, GPU_LABELS, GPU_PROFILES } from "@/lib/fixtures";
+import type {
+  RunpodCloud,
+  RunpodDryRunPlan,
+  RunpodOverview,
+  RunpodProfileId,
+} from "@/lib/runpod-types";
 import { useStudio } from "./studio-provider";
 import { ErrorMessage, Modal, useToast } from "./ui";
+
+const AVAILABILITY_LABELS = {
+  HIGH: "Tinggi",
+  MEDIUM: "Sedang",
+  LOW: "Rendah",
+  NONE: "Tidak tersedia",
+  UNKNOWN: "Tidak diketahui",
+};
+
+async function responseMessage(response: Response, fallback: string) {
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string;
+  } | null;
+  return payload?.message || fallback;
+}
 
 export function GpuPage() {
   const { state, service } = useStudio();
   const { session, settings } = state;
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [runpodOverview, setRunpodOverview] = useState<RunpodOverview | null>(
+    null,
+  );
+  const [runpodPlan, setRunpodPlan] = useState<RunpodDryRunPlan | null>(null);
+  const [runpodError, setRunpodError] = useState("");
+  const [runpodLoading, setRunpodLoading] = useState(service.mode === "api");
+  const [planLoading, setPlanLoading] = useState(service.mode === "api");
+  const [cloud, setCloud] = useState<RunpodCloud>("community");
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const toast = useToast();
   const active = !["off", "error"].includes(session.status);
   const transitioning = ["provisioning", "loading", "stopping"].includes(
@@ -41,6 +76,94 @@ export function GpuPage() {
         );
   const remaining =
     session.expiresAt === null ? 0 : (session.expiresAt - state.now) / 1000;
+
+  useEffect(() => {
+    if (service.mode !== "api") return;
+    const controller = new AbortController();
+    void fetch(
+      `/api/v1/runpod/overview${refreshVersion > 0 ? "?fresh=1" : ""}`,
+      {
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    )
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error(
+            await responseMessage(
+              response,
+              "Status baca RunPod tidak dapat dimuat.",
+            ),
+          );
+        const payload = (await response.json()) as { overview: RunpodOverview };
+        setRunpodOverview(payload.overview);
+      })
+      .catch((problem) => {
+        if (!controller.signal.aborted)
+          setRunpodError(
+            problem instanceof Error
+              ? problem.message
+              : "Status baca RunPod tidak dapat dimuat.",
+          );
+        if (!controller.signal.aborted) setPlanLoading(false);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRunpodLoading(false);
+      });
+    return () => controller.abort();
+  }, [refreshVersion, service.mode]);
+
+  useEffect(() => {
+    if (service.mode !== "api" || !runpodOverview) return;
+    const controller = new AbortController();
+    const profileId = settings.gpuId as RunpodProfileId;
+    void fetch("/api/v1/runpod/plan", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+      body: JSON.stringify({
+        profileId,
+        cloud,
+        durationMinutes: settings.sessionMinutes,
+        maximumHourlyRate: settings.maxHourlyRate,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error(
+            await responseMessage(
+              response,
+              "Rencana dry-run tidak dapat dihitung.",
+            ),
+          );
+        const payload = (await response.json()) as { plan: RunpodDryRunPlan };
+        setRunpodPlan(payload.plan);
+      })
+      .catch((problem) => {
+        if (!controller.signal.aborted) {
+          setRunpodPlan(null);
+          setRunpodError(
+            problem instanceof Error
+              ? problem.message
+              : "Rencana dry-run tidak dapat dihitung.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPlanLoading(false);
+      });
+    return () => controller.abort();
+  }, [
+    cloud,
+    runpodOverview,
+    service.mode,
+    settings.gpuId,
+    settings.maxHourlyRate,
+    settings.sessionMinutes,
+  ]);
   async function start() {
     setError("");
     try {
@@ -86,11 +209,167 @@ export function GpuPage() {
       <div className="demo-notice">
         <Info size={17} />
         <p>
-          Seluruh status dan biaya di halaman ini adalah{" "}
-          <strong>simulasi lokal</strong> {service.mode === "api" ? "melalui API" : "di browser"}.
-          Tidak terhubung ke RunPod.
+          Kontrol sesi dan timer di bawah tetap <strong>simulasi lokal</strong>{" "}
+          {service.mode === "api"
+            ? "melalui API. Panel RunPod hanya membaca inventaris dan katalog; tidak ada aksi cloud."
+            : "di browser dan tidak terhubung ke RunPod."}
         </p>
       </div>
+      {service.mode === "api" && (
+        <section className="panel runpod-panel" aria-labelledby="runpod-title">
+          <div className="runpod-heading">
+            <div className="runpod-title">
+              <span className="runpod-icon">
+                <Cloud size={20} />
+              </span>
+              <div>
+                <span className="eyebrow">RUNPOD REST API V2</span>
+                <h2 id="runpod-title">Status akun baca saja</h2>
+              </div>
+            </div>
+            <div className="runpod-heading-actions">
+              <span className="read-only-badge">
+                <ShieldCheck size={14} /> Read only
+              </span>
+              <button
+                className="button compact"
+                disabled={runpodLoading || planLoading}
+                onClick={() => {
+                  setRunpodLoading(true);
+                  setPlanLoading(true);
+                  setRunpodPlan(null);
+                  setRunpodError("");
+                  setRefreshVersion((value) => value + 1);
+                }}
+              >
+                <RefreshCw className={runpodLoading ? "spin" : ""} size={15} />
+                Segarkan
+              </button>
+            </div>
+          </div>
+          {runpodError && (
+            <div className="runpod-error">
+              <ErrorMessage>{runpodError}</ErrorMessage>
+            </div>
+          )}
+          {runpodLoading && !runpodOverview ? (
+            <div className="runpod-loading" role="status">
+              <LoaderCircle className="spin" size={18} />
+              Membaca inventaris dan katalog RunPod…
+            </div>
+          ) : runpodOverview ? (
+            <>
+              <div className="runpod-stats">
+                <div>
+                  <Server size={18} />
+                  <span>Pod di akun</span>
+                  <strong>{runpodOverview.inventory.podCount}</strong>
+                  <small>Tidak membuat atau mengubah Pod</small>
+                </div>
+                <div>
+                  <Cpu size={18} />
+                  <span>Tipe GPU</span>
+                  <strong>{runpodOverview.catalog.gpuTypeCount}</strong>
+                  <small>
+                    Minimum CUDA {runpodOverview.minimumCudaVersion}
+                  </small>
+                </div>
+                <div>
+                  <Database size={18} />
+                  <span>Data center</span>
+                  <strong>{runpodOverview.catalog.dataCenterCount}</strong>
+                  <small>Storage belum dipilih</small>
+                </div>
+              </div>
+              <div className="runpod-plan-controls">
+                <div>
+                  <strong>Rencana RunPod</strong>
+                  <p>
+                    Perhitungan lokal dari katalog terbaru. Tidak mengirim
+                    mutation.
+                  </p>
+                </div>
+                <label htmlFor="runpod-cloud">
+                  Jenis cloud
+                  <select
+                    id="runpod-cloud"
+                    value={cloud}
+                    onChange={(event) => {
+                      setPlanLoading(true);
+                      setRunpodPlan(null);
+                      setRunpodError("");
+                      setCloud(event.target.value as RunpodCloud);
+                    }}
+                  >
+                    <option value="community">Community Cloud</option>
+                    <option value="secure">Secure Cloud</option>
+                  </select>
+                </label>
+              </div>
+              {runpodPlan && (
+                <div className="runpod-dry-run" aria-busy={planLoading}>
+                  <div className="dry-run-summary">
+                    <span>
+                      {planLoading ? (
+                        <LoaderCircle className="spin" size={16} />
+                      ) : (
+                        <ShieldCheck size={16} />
+                      )}
+                      Dry-run · tidak membuat resource
+                    </span>
+                    <strong>
+                      {runpodPlan.hourlyRate === null
+                        ? "Tarif tidak tersedia"
+                        : `$${runpodPlan.hourlyRate.toFixed(2)}/jam`}
+                    </strong>
+                    <small>
+                      Estimasi {runpodPlan.durationMinutes} menit:{" "}
+                      {runpodPlan.estimatedComputeCost === null
+                        ? "—"
+                        : `$${runpodPlan.estimatedComputeCost.toFixed(2)}`}
+                    </small>
+                  </div>
+                  <div className="dry-run-details">
+                    <div>
+                      <span>Ketersediaan</span>
+                      <strong>
+                        {AVAILABILITY_LABELS[runpodPlan.availability]}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Batas harga</span>
+                      <strong>
+                        {runpodPlan.checks.rateWithinLimit
+                          ? `Lulus · ≤ $${runpodPlan.maximumHourlyRate.toFixed(2)}`
+                          : `Melewati $${runpodPlan.maximumHourlyRate.toFixed(2)}`}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Lokasi tersedia</span>
+                      <strong>
+                        <MapPin size={14} />
+                        {runpodPlan.dataCenters.length
+                          ? runpodPlan.dataCenters.join(", ")
+                          : "Belum ada"}
+                      </strong>
+                    </div>
+                  </div>
+                  <ul className="dry-run-blockers">
+                    {runpodPlan.blockers.map((blocker) => (
+                      <li key={blocker}>{blocker}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="runpod-observed">
+                Dibaca{" "}
+                {new Date(runpodOverview.observedAt).toLocaleString("id-ID")}
+                {" · "}saldo tidak dibaca oleh endpoint ini.
+              </p>
+            </>
+          ) : null}
+        </section>
+      )}
       <section className="session-panel panel">
         <div className="session-status-heading">
           <div
@@ -198,34 +477,58 @@ export function GpuPage() {
       </section>
       <div className="section-heading">
         <h2>Pilih profil GPU</h2>
-        <span className="small muted">Tarif contoh untuk simulasi</span>
+        <span className="small muted">
+          {runpodOverview
+            ? `Harga RunPod ${cloud === "community" ? "Community" : "Secure"}`
+            : "Tarif contoh untuk simulasi"}
+        </span>
       </div>
       <div className="gpu-profile-grid">
-        {GPU_PROFILES.map((profile) => (
-          <button
-            disabled={active}
-            key={profile.id}
-            className={`gpu-profile panel ${settings.gpuId === profile.id ? "selected" : ""}`}
-            aria-pressed={settings.gpuId === profile.id}
-            onClick={() => {
-              service.updateSettings({ gpuId: profile.id });
-              setError("");
-            }}
-          >
-            <span className="profile-radio">
-              {settings.gpuId === profile.id && <Check size={12} />}
-            </span>
-            <Cpu size={22} />
-            <span className="gpu-profile-name">{profile.name}</span>
-            <span className="gpu-profile-memory">
-              {profile.memory} VRAM · {profile.detail}
-            </span>
-            <span className="gpu-profile-price">
-              ${profile.rate.toFixed(2)}
-              <small>/ jam demo</small>
-            </span>
-          </button>
-        ))}
+        {GPU_PROFILES.map((profile) => {
+          const liveProfile = runpodOverview?.catalog.profiles.find(
+            (item) => item.profileId === profile.id,
+          );
+          const liveOffer = liveProfile?.offers[cloud];
+          return (
+            <button
+              disabled={active}
+              key={profile.id}
+              className={`gpu-profile panel ${settings.gpuId === profile.id ? "selected" : ""}`}
+              aria-pressed={settings.gpuId === profile.id}
+              onClick={() => {
+                if (service.mode === "api") {
+                  setPlanLoading(true);
+                  setRunpodPlan(null);
+                  setRunpodError("");
+                }
+                service.updateSettings({ gpuId: profile.id });
+                setError("");
+              }}
+            >
+              <span className="profile-radio">
+                {settings.gpuId === profile.id && <Check size={12} />}
+              </span>
+              <Cpu size={22} />
+              <span className="gpu-profile-name">{profile.name}</span>
+              <span className="gpu-profile-memory">
+                {profile.memory} VRAM · {profile.detail}
+              </span>
+              <span className="gpu-profile-price">
+                {liveOffer?.hourlyRate === null || liveOffer === undefined
+                  ? `$${profile.rate.toFixed(2)}`
+                  : `$${liveOffer.hourlyRate.toFixed(2)}`}
+                <small>{liveOffer ? "/ jam RunPod" : "/ jam demo"}</small>
+              </span>
+              {liveOffer && (
+                <span
+                  className={`live-availability ${liveOffer.availability.toLowerCase()}`}
+                >
+                  {AVAILABILITY_LABELS[liveOffer.availability]} · data langsung
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
       <section className="panel settings-section">
         <div className="panel-heading">
@@ -249,11 +552,16 @@ export function GpuPage() {
             id="session-duration"
             disabled={active}
             value={settings.sessionMinutes}
-            onChange={(event) =>
+            onChange={(event) => {
+              if (service.mode === "api") {
+                setPlanLoading(true);
+                setRunpodPlan(null);
+                setRunpodError("");
+              }
               service.updateSettings({
                 sessionMinutes: Number(event.target.value),
-              })
-            }
+              });
+            }}
           >
             {[30, 60, 120, 240].map((value) => (
               <option key={value} value={value}>

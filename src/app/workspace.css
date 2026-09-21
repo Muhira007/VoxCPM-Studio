@@ -1,7 +1,17 @@
 /* Library, history, session controls and shared form components. */
-.editor-panel { display:flex; flex-direction:column; }
-.editor-panel .text-editor { display:flex; flex:1; flex-direction:column; }
-.editor-panel .text-editor textarea { flex:1; min-height:240px; }
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+}
+.editor-panel .text-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.editor-panel .text-editor textarea {
+  flex: 1;
+  min-height: 240px;
+}
 .mobile-nav .nav-link:hover {
   background: #f4f5f7;
   color: #303640;
@@ -503,6 +513,213 @@ textarea::placeholder {
   overflow: auto;
   overflow-wrap: anywhere;
 }
+.runpod-panel {
+  margin-bottom: 24px;
+  border-color: #d9e3ec;
+}
+.runpod-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border-bottom: 1px solid #e7edf2;
+  background: #f9fbfd;
+}
+.runpod-title,
+.runpod-heading-actions,
+.runpod-title > div:first-child {
+  display: flex;
+  align-items: center;
+}
+.runpod-title {
+  gap: 12px;
+}
+.runpod-title .eyebrow {
+  margin: 0 0 4px;
+  color: #557187;
+  letter-spacing: 1.4px;
+}
+.runpod-title h2 {
+  font-size: 17px;
+}
+.runpod-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #eaf2f8;
+  color: #4f748e;
+  flex-shrink: 0;
+}
+.runpod-heading-actions {
+  gap: 9px;
+}
+.read-only-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid #cfe1d4;
+  border-radius: 999px;
+  background: #f2f9f4;
+  color: #50785d;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.button.compact {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+.runpod-error {
+  padding: 18px 24px 0;
+}
+.runpod-loading {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #697887;
+  font-size: 14px;
+}
+.runpod-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid #e7edf2;
+}
+.runpod-stats > div {
+  position: relative;
+  padding: 22px 24px;
+  border-right: 1px solid #e7edf2;
+}
+.runpod-stats > div:last-child {
+  border-right: 0;
+}
+.runpod-stats svg {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  color: #7892a6;
+}
+.runpod-stats span,
+.runpod-stats small {
+  display: block;
+  color: #758391;
+  font-size: 12px;
+}
+.runpod-stats strong {
+  display: block;
+  margin: 8px 0 5px;
+  font-size: 27px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.runpod-plan-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px;
+}
+.runpod-plan-controls strong {
+  font-size: 14px;
+}
+.runpod-plan-controls p {
+  margin-top: 4px;
+  color: #77828e;
+  font-size: 12px;
+}
+.runpod-plan-controls label {
+  color: #65717e;
+  font-size: 12px;
+  font-weight: 550;
+}
+.runpod-plan-controls select {
+  display: block;
+  min-width: 180px;
+  margin-top: 6px;
+}
+.runpod-dry-run {
+  margin: 0 24px;
+  border: 1px solid #dfe6ec;
+  border-radius: 9px;
+  background: #fbfcfd;
+}
+.dry-run-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e7ecf0;
+}
+.dry-run-summary > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #517560;
+  font-size: 13px;
+  font-weight: 600;
+}
+.dry-run-summary strong {
+  grid-row: span 2;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.dry-run-summary small {
+  color: #74808d;
+  font-size: 12px;
+}
+.dry-run-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 16px 20px;
+  border-bottom: 1px solid #e7ecf0;
+}
+.dry-run-details > div {
+  padding: 0 15px;
+  border-right: 1px solid #e5eaee;
+}
+.dry-run-details > div:first-child {
+  padding-left: 0;
+}
+.dry-run-details > div:last-child {
+  padding-right: 0;
+  border: 0;
+}
+.dry-run-details span,
+.dry-run-details strong {
+  display: block;
+  font-size: 12px;
+}
+.dry-run-details span {
+  margin-bottom: 5px;
+  color: #7b8792;
+}
+.dry-run-details strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+.dry-run-blockers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 22px;
+  padding: 16px 20px 16px 38px;
+  color: #75695f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.runpod-observed {
+  padding: 13px 24px 18px;
+  color: #7b8791;
+  font-size: 11px;
+}
 .session-status-heading {
   display: flex;
   align-items: center;
@@ -690,6 +907,24 @@ textarea::placeholder {
   color: #7d8491;
   margin-left: 5px;
 }
+.live-availability {
+  margin-top: 2px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #eef3f7;
+  color: #617587;
+  font-size: 11px;
+  font-weight: 550;
+}
+.live-availability.high,
+.live-availability.medium {
+  background: #eef7f1;
+  color: #4f785c;
+}
+.live-availability.none {
+  background: #f7eeee;
+  color: #9a5a53;
+}
 .settings-section {
   margin-top: 24px;
 }
@@ -831,6 +1066,61 @@ textarea::placeholder {
     gap: 6px;
   }
   .extra-input {
+    padding-inline: 18px;
+  }
+  .runpod-heading,
+  .runpod-plan-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .runpod-heading-actions {
+    justify-content: space-between;
+  }
+  .runpod-heading-actions .button {
+    flex: 1;
+  }
+  .runpod-stats,
+  .dry-run-details,
+  .dry-run-blockers {
+    grid-template-columns: 1fr;
+  }
+  .runpod-stats > div {
+    border-right: 0;
+    border-bottom: 1px solid #e7edf2;
+  }
+  .runpod-stats > div:last-child {
+    border-bottom: 0;
+  }
+  .runpod-plan-controls select {
+    width: 100%;
+  }
+  .runpod-dry-run {
+    margin-inline: 18px;
+  }
+  .dry-run-summary {
+    grid-template-columns: 1fr;
+  }
+  .dry-run-summary strong {
+    grid-row: auto;
+  }
+  .dry-run-details {
+    gap: 12px;
+  }
+  .dry-run-details > div,
+  .dry-run-details > div:first-child,
+  .dry-run-details > div:last-child {
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid #e5eaee;
+  }
+  .dry-run-details > div:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .dry-run-blockers {
+    padding-left: 36px;
+  }
+  .runpod-observed {
     padding-inline: 18px;
   }
   .session-status-heading {
