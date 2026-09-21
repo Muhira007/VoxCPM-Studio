@@ -50,7 +50,7 @@ docker build --platform linux/amd64 `
   worker
 ```
 
-Build tidak mengunduh bobot model dan tidak membutuhkan GPU. Workflow `.github/workflows/worker-gpu-image.yml` menjalankan build yang sama di GitHub Actions, memeriksa package, memastikan proses turun ke UID `10001`, dan memastikan startup gagal dengan pesan yang jelas ketika runner tidak memiliki CUDA.
+Build tidak mengunduh bobot model dan tidak membutuhkan GPU. Workflow `.github/workflows/worker-gpu-image.yml` menjalankan build yang sama di GitHub Actions, memeriksa package, memastikan proses turun ke UID `10001`, dan memastikan startup gagal dengan pesan yang jelas ketika runner tidak memiliki CUDA. Pemeriksaan ini lulus pada [GitHub Actions run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429).
 
 ## Konfigurasi template RunPod nanti
 

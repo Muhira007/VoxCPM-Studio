@@ -71,7 +71,7 @@ npm run build
 
 Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Keduanya tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup persistensi server, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, dan kegagalan simulasi.
 
-Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Image Docker juga berhasil dibangun dan diuji pada [GitHub Actions](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35540568742), termasuk health check dan persistensi setelah restart.
+Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Container simulasi kembali lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
 
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 

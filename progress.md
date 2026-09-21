@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4A selesai; implementasi Fase 4B selesai lokal dan menunggu validasi build image GPU di CI.**
-Fase aktif: **Fase 4B — paket VoxCPM2/CUDA disiapkan tanpa membuat resource RunPod; saldo masih $0,00.**
+Status: **Fase 0–4B selesai; Fase 5 menunggu saldo RunPod, batas biaya, dan strategi storage.**
+Fase aktif: **Persiapan Fase 5 — paket VoxCPM2/CUDA telah lolos build tanpa GPU; saldo masih $0,00 dan belum ada resource berbayar.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -225,7 +225,7 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [x] Menyediakan endpoint audio hasil terautentikasi pada worker dan API aplikasi.
 - [x] Membuat `worker/Dockerfile.gpu`, startup UID `10001`, mount `/workspace`, health check, dan dokumentasi template RunPod.
 - [x] Menguji kontrak baru tanpa GPU memakai fake runtime serta seluruh regresi simulasi/frontend/backend.
-- [ ] Membangun image GPU dari nol pada GitHub Actions dan memverifikasi package serta startup fail-closed tanpa CUDA. Menunggu push dan hasil workflow.
+- [x] Membangun image GPU dari nol pada GitHub Actions dan memverifikasi package serta startup fail-closed tanpa CUDA.
 
 **Hasil verifikasi lokal Fase 4B, 21 September 2026:**
 
@@ -233,13 +233,16 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Backend tidak lagi mengirim path Windows ke worker jarak jauh. Referensi diunggah dengan ID aman dan batas 20 MB; output worker dibatasi 100 MB sebelum disimpan oleh aplikasi.
 - Pemetaan empat mode dan penulisan WAV diuji tanpa mengimpor model nyata. Hasil ini memvalidasi adapter, bukan inferensi GPU atau kualitas suara.
 - 7/7 pengujian worker dan 22/22 pengujian Node lulus. TypeScript dan ESLint lulus.
+- [Application checks run 35568741475](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741475) lulus untuk test Node, TypeScript, ESLint, dan build Next.js termasuk route audio hasil.
+- [Worker container run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418) membuktikan regresi container simulasi, autentikasi, readiness, persistensi, dan health check tetap lulus.
+- [GPU worker image run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429) membangun image dari nol; preflight mencatat FastAPI `0.135.1`, Starlette `0.52.1`, PyTorch/TorchAudio `2.8.0+cu128`, TorchCodec `0.7.0`, Uvicorn `0.42.0`, dan VoxCPM `2.0.3`. Container turun ke UID `10001`, mempertahankan model revision yang dipin, dan berhenti dengan jelas ketika CUDA tidak tersedia.
 - Rancangan dan konfigurasi terdapat di `docs/gpu-worker-package.md`. Tidak ada Pod, volume, API key RunPod, atau biaya cloud yang dibuat.
 
-**Batas saat ini:** image belum selesai dibangun di CI dan belum dijalankan dengan NVIDIA GPU. Bobot model belum diunduh, WAV AI belum dihasilkan, sample rate belum diperiksa dari berkas nyata, dan kebutuhan VRAM/cold start belum diukur.
+**Batas saat ini:** image sudah dibangun di CI tetapi belum dijalankan dengan NVIDIA GPU. Bobot model belum diunduh, WAV AI belum dihasilkan, sample rate belum diperiksa dari berkas nyata, dan kebutuhan VRAM/cold start belum diukur.
 
 **Kriteria selesai:** image GPU dapat dibangun reproducibly tanpa GPU, versi inti terverifikasi, startup tanpa CUDA gagal jelas, dan kontrak transfer referensi/hasil lolos. Inferensi tetap menunggu Fase 5.
 
-**Status fase:** implementasi lokal selesai; validasi container CI masih terbuka.
+**Status fase:** selesai. Seluruh checklist tanpa GPU lulus; inferensi nyata tetap menunggu Fase 5.
 
 ## 10. Fase 5 — Integrasi RunPod setelah saldo tersedia
 
@@ -330,10 +333,11 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | API Next.js, penyimpanan server, worker FastAPI simulasi, Dockerfile, dan rancangan kontrol cloud ditambahkan. | 15/15 tes Node, 4/4 tes worker, lint, TypeScript, build Next.js, serta integrasi dua proses lulus. | Docker tidak tersedia sehingga image belum dibangun. Web UI belum dialihkan ke API agar kunci backend tidak bocor ke browser. |
 | 21 September 2026 | Fase 4 selesai melalui validasi container di GitHub Actions tanpa memakai RunPod. | Image berhasil dibangun; container non-root, autentikasi, simulasi, restart/persistensi, dan Docker health check lulus pada run 35540568742. | Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah autentikasi sesi `HttpOnly` dan adapter API Web UI secara lokal sambil menunggu prasyarat Fase 5. |
 | 21 September 2026 | Fase 4A selesai: login `HttpOnly`, origin guard, adapter API, polling, audio server, reset, dan logout terhubung ke Web UI. | 22/22 tes Node, TypeScript, ESLint, build produksi, integrasi HTTP, serta alur browser login → sesi → pekerjaan selesai → logout lulus; CI publik tercatat pada run 35566625556. | Worker masih simulasi dan saldo RunPod $0,00. Siapkan keputusan harga, storage, image GPU, serta batas durasi sebelum Fase 5. |
+| 21 September 2026 | Fase 4B selesai: adapter VoxCPM2, transfer referensi/hasil, preflight CUDA, dependency pin, serta image GPU RunPod disiapkan tanpa Pod. | 7/7 tes worker, 22/22 tes Node, build aplikasi dan container simulasi lulus; image GPU dibangun dari nol dan package/fail-closed startup diverifikasi pada run 35568741429. | Image belum diterbitkan ke registry dan belum diuji pada GPU. Saldo RunPod masih $0,00. Rekomendasi berikutnya adalah publikasi image immutable ke registry tanpa membuat Pod. |
 
 ## 15. Langkah pengerjaan berikutnya
 
-**Langkah langsung:** selesaikan Fase 4B dengan build image GPU di GitHub Actions. Build hanya memeriksa base image, resolver package, import VoxCPM, UID, revision model, dan kegagalan startup tanpa CUDA; build tidak mengunduh bobot model dan tidak memakai RunPod.
+**Rekomendasi selama saldo RunPod masih $0,00:** terbitkan image yang sudah lolos ke GitHub Container Registry dengan tag commit immutable dan catat digest-nya. Langkah ini membuat artefak siap ditarik RunPod tanpa membuat Pod; workflow publikasi harus tetap memisahkan build tervalidasi dari kredensial RunPod.
 
 Sesudah saldo tersedia, mulai Fase 5 dari pemeriksaan harga dan ketersediaan aktual, pilih batas harga serta durasi uji, lalu tentukan storage sebelum membuat Pod. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 
