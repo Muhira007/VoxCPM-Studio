@@ -27,7 +27,7 @@ Kerangka operasi tulis sudah diimplementasikan dan diuji tanpa akun berbayar:
 - Stop dibedakan dari terminate. Sesi baru dianggap berhenti setelah RunPod melaporkan `EXITED` atau `TERMINATED`; respons stop yang masih aktif menghasilkan backoff dan retry terbatas.
 - `GET/POST /api/v1/runpod/control` dilindungi autentikasi studio dan same-origin guard. Web UI hanya menampilkan status kunci dan belum menyediakan tombol mutation.
 
-Seluruh jalur di atas telah diuji dengan fake RunPod. Key aktual masih baca saja, `RUNPOD_WRITE_ENABLED=false`, data center dan volume ID belum diisi, serta akun tetap memiliki nol Pod. Pengawas deadline belum dideploy pada layanan cloud yang selalu aktif, jadi pengujian lokal belum memenuhi jaminan shutdown ketika PC mati.
+Seluruh jalur di atas telah diuji dengan fake RunPod. Key aktual masih baca saja, `RUNPOD_WRITE_ENABLED=false`, data center dan volume ID belum diisi, serta akun tetap memiliki nol Pod. Watchdog sudah tersedia sebagai `npm run runpod:watchdog`, memakai file lock lintas proses dan template timer satu menit. Pengawas belum dideploy pada layanan cloud yang selalu aktif, jadi pengujian lokal belum memenuhi jaminan shutdown ketika PC mati. Rincian operasional ada di [runbook watchdog](runpod-watchdog.md).
 
 ## Keputusan storage
 
@@ -39,7 +39,7 @@ Referensi: [Network Volumes](https://docs.runpod.io/storage/network-volumes), [j
 
 Next.js bertindak sebagai control plane. Storage persisten menyimpan `podId`, status yang terakhir diverifikasi, batas harga, waktu mulai, `hardDeadline`, `idleDeadline`, pekerjaan, lokasi referensi/hasil, jumlah retry, serta versi state. GPU worker hanya menjalankan pekerjaan dan tidak menjadi sumber kebenaran untuk tagihan atau umur Pod.
 
-Pengawas shutdown harus berjalan pada layanan cloud yang tetap hidup ketika browser ditutup dan PC pengguna mati. Ia tidak boleh bergantung pada timer React, proses Next.js lokal, atau Pod GPU yang hendak dihentikan.
+Pengawas shutdown harus berjalan pada layanan cloud yang tetap hidup ketika browser ditutup dan PC pengguna mati. Ia tidak boleh bergantung pada timer React, proses Next.js lokal, atau Pod GPU yang hendak dihentikan. Model awal memakai satu replica aplikasi dan scheduler pada persistent filesystem yang sama; multi-replica memerlukan datastore transaksional bersama.
 
 ## State machine
 

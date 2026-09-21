@@ -77,6 +77,9 @@ export interface RunpodControlStatus {
     immutableImage: boolean;
     idempotency: true;
     persistedLease: true;
+    crossProcessFileLock: true;
+    schedulerCommandReady: true;
+    singleReplicaRequired: true;
     reconcileBeforeCreate: true;
     hardDeadline: true;
     verifiedStopRequired: true;

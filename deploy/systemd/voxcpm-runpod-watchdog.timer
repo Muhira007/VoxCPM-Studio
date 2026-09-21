@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the VoxCPM Studio RunPod watchdog every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+RandomizedDelaySec=5s
+Persistent=true
+Unit=voxcpm-runpod-watchdog.service
+
+[Install]
+WantedBy=timers.target

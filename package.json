@@ -13,6 +13,7 @@
     "test:worker": "python -m pytest worker/tests -q",
     "test:all": "npm test && npm run test:worker",
     "worker:start": "python worker/start.py",
+    "runpod:watchdog": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/runpod-watchdog.ts",
     "format": "prettier --write src tests *.json *.mjs *.ts"
   },
   "dependencies": {

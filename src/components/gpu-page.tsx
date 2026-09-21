@@ -339,7 +339,9 @@ export function GpuPage() {
                           ? "Volume dan lokasi siap"
                           : "Volume / lokasi belum diisi"}
                       </strong>
-                      <small>Watchdog cloud belum dideploy</small>
+                      <small>
+                        Command watchdog siap · cloud belum dideploy
+                      </small>
                     </div>
                   </div>
                 </div>

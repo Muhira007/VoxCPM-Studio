@@ -1,0 +1,51 @@
+# RunPod watchdog scheduler
+
+Watchdog sudah dikemas sebagai command sekali jalan. Command membaca state persisten, memeriksa hard deadline atau retry yang sudah jatuh tempo, lalu keluar. Ia tidak membuat loop sendiri sehingga platform scheduler dapat mengatur cadence, timeout, restart, dan alert.
+
+```bash
+npm run runpod:watchdog
+```
+
+Dengan konfigurasi repository saat ini, hasilnya adalah JSON seperti berikut dan tidak ada request mutation:
+
+```json
+{"ok":true,"action":"skipped_writes_disabled","phase":"off"}
+```
+
+Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan yang jatuh tempo. Exit code nonzero harus memicu alert operator. Output tidak memuat API key, worker key, teks pengguna, atau audio.
+
+## Model deployment yang dipilih
+
+Tahap pertama memakai **satu replica aplikasi** dan satu persistent filesystem untuk `VOXCPM_DATA_DIR`. Proses Next.js dan command watchdog harus membaca direktori yang sama. `RunpodControlStore` memakai exclusive file lock untuk membuat transaksi state antarproses berurutan, memulihkan lock yang tertinggal lebih dari 60 detik, dan tetap memakai lease operasi persisten selama 120 detik.
+
+Jangan menjalankan beberapa replica dengan disk lokal masing-masing. File lock tidak dapat mengoordinasikan filesystem yang berbeda. Deployment multi-replica memerlukan datastore bersama dengan transaksi compare-and-swap sebelum operasi tulis RunPod boleh diaktifkan.
+
+## Template systemd
+
+Template ada di `deploy/systemd/voxcpm-runpod-watchdog.service` dan `deploy/systemd/voxcpm-runpod-watchdog.timer`. Template menjalankan command setiap menit dengan timeout 60 detik. Sesuaikan `User`, `Group`, `WorkingDirectory`, path `npm`, dan `EnvironmentFile` dengan host deployment.
+
+Environment file harus hanya dapat dibaca oleh akun service. Aplikasi dan timer harus memakai nilai yang sama untuk `VOXCPM_DATA_DIR`, konfigurasi RunPod, dan worker key. Jangan menaruh environment file di repository.
+
+Contoh instalasi setelah host cloud tersedia:
+
+```bash
+sudo install -m 0644 deploy/systemd/voxcpm-runpod-watchdog.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/voxcpm-runpod-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now voxcpm-runpod-watchdog.timer
+systemctl list-timers voxcpm-runpod-watchdog.timer
+```
+
+Perintah instalasi di atas belum dijalankan. Timer baru boleh diaktifkan setelah host selalu aktif tersedia, persistent directory terpasang, log/alert dipantau, dan satu replica dipastikan.
+
+## Checklist sebelum operasi berbayar
+
+- `npm run runpod:watchdog` berjalan sukses dengan `RUNPOD_WRITE_ENABLED=false`.
+- Aplikasi dan timer memakai persistent `VOXCPM_DATA_DIR` yang sama.
+- Hanya satu replica aplikasi yang dapat menulis state.
+- API key hanya mempunyai izin create/start/stop yang dibutuhkan; terminate tetap tidak tersedia.
+- Network Volume dan data center sudah cocok dengan GPU yang dipilih.
+- Scheduler berjalan setiap menit dan exit code nonzero menghasilkan alert.
+- Uji terkontrol membuktikan proses berhenti ketika browser serta PC pengguna mati.
+
+Deployment cloud dan verifikasi terakhir tetap menunggu saldo serta host yang dipilih.

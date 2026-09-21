@@ -1,0 +1,17 @@
+[Unit]
+Description=VoxCPM Studio RunPod deadline watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=voxcpm
+Group=voxcpm
+WorkingDirectory=/opt/voxcpm-studio
+EnvironmentFile=/etc/voxcpm-studio.env
+ExecStart=/usr/bin/npm run runpod:watchdog
+TimeoutStartSec=60
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -29,6 +29,8 @@ Panel RunPod baca saja tersedia dalam mode API bila `RUNPOD_API_KEY` berisi key 
 
 Strategi persisten yang dipilih adalah **Standard Network Volume 30 GB** pada `/workspace`, dengan estimasi storage `$2.10/bulan` berdasarkan `$0.07/GB/bulan`. Volume dan data center aktual belum dibuat atau dipilih. Gateway create/start/stop berada di balik `RUNPOD_WRITE_ENABLED=false`, memakai idempotency ID, lease persisten, rekonsiliasi Pod, batas biaya, hard deadline, retry stop, serta konfirmasi status terminal. Tidak ada operasi terminate. Pengawas deadline sudah diuji dengan fake gateway, tetapi belum dideploy pada layanan cloud yang tetap hidup ketika komputer lokal mati.
 
+Watchdog scheduler dapat dijalankan sekali dengan `npm run runpod:watchdog`. State store memakai file lock lintas proses dan pemulihan lock basi, sehingga aplikasi serta scheduler pada satu host dan persistent directory yang sama tidak menimpa state. Model deployment awal dibatasi ke satu replica; lihat [runbook watchdog](docs/runpod-watchdog.md) dan template systemd di `deploy/systemd/`.
+
 ## Fitur yang bisa dicoba
 
 | Halaman       | Perilaku saat ini                                                                                                                                |
@@ -104,11 +106,13 @@ src/server/               Persistensi, validasi, autentikasi, dan client worker
 src/server/runpod-client.ts Client REST API v2 GET-only dan planner lokal
 src/server/runpod-controller.ts State machine, lease, deadline, dan rekonsiliasi Pod
 src/server/runpod-control-gateway.ts Gateway create/start/stop dengan feature lock
+src/server/runpod-watchdog-runner.ts Ringkasan eksekusi watchdog sekali jalan
 src/app/api/v1/           Route Handler API aplikasi
 worker/app/               Worker FastAPI mode simulasi dan adapter VoxCPM2
 worker/Dockerfile.gpu     Image GPU RunPod dengan versi model/dependensi terkunci
 worker/tests/             Pengujian kontrak worker
 docs/                     API lokal, paket GPU, dan rancangan kontrol RunPod
+deploy/systemd/            Template service dan timer watchdog satu replica
 tests/                    Pengujian frontend dan backend Node
 .github/workflows/        Validasi otomatis image dan kontrak container
 ```

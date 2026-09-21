@@ -27,7 +27,7 @@ import {
 
 const MANAGED_POD_PREFIX = "voxcpm-studio-";
 const MAX_STOP_FAILURES = 3;
-const LEASE_MILLISECONDS = 30_000;
+const LEASE_MILLISECONDS = 120_000;
 
 const RUNPOD_GPU_IDS: Record<RunpodProfileId, string> = {
   a5000: "NVIDIA RTX A5000",
@@ -228,6 +228,9 @@ export class RunpodController {
         immutableImage: /@sha256:[a-f0-9]{64}$/.test(this.config.workerImage),
         idempotency: true,
         persistedLease: true,
+        crossProcessFileLock: true,
+        schedulerCommandReady: true,
+        singleReplicaRequired: true,
         reconcileBeforeCreate: true,
         hardDeadline: true,
         verifiedStopRequired: true,

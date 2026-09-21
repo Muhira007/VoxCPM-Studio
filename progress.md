@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4C, integrasi baca saja, dan kerangka pengaman lokal Fase 5 selesai; resource GPU menunggu saldo serta volume/data center aktual.**
-Fase aktif: **Fase 5.1 — state machine sudah terkunci dan diuji dengan fake RunPod; saldo masih $0,00 dan belum ada resource berbayar.**
+Status: **Fase 0–4C, integrasi baca saja, control plane, dan paket watchdog lokal Fase 5 selesai; resource GPU menunggu saldo serta volume/data center aktual.**
+Fase aktif: **Fase 5.2 — command scheduler dan single-replica lock sudah siap; deployment cloud serta idle shutdown belum dikerjakan.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -298,6 +298,10 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [x] Membuat gateway create/start/stop terpisah yang menolak mutation sebelum jaringan ketika `RUNPOD_WRITE_ENABLED=false`; operasi terminate tidak tersedia.
 - [x] Menyimpan state kontrol atomik, idempotency hash, lease, Pod ID, hard deadline, retry, dan waktu verifikasi pada `.data/runpod-control.json`.
 - [x] Menguji create sekali, retry idempoten, adopsi/resume Pod `EXITED`, rekonsiliasi readiness, stop, dan konflik biaya dengan fake RunPod.
+- [x] Menambahkan mutex file lintas proses, pemulihan lock basi, dan lease 120 detik untuk aplikasi serta scheduler pada persistent directory yang sama.
+- [x] Menguji restart setelah hasil create ambigu: Pod yang muncul diadopsi, sedangkan create tidak dikirim ulang jika hasilnya belum dapat dipastikan.
+- [x] Mengemas `npm run runpod:watchdog` sebagai command sekali jalan dengan output JSON dan exit code yang dapat dipantau scheduler.
+- [x] Menyediakan template service/timer systemd satu menit dan menetapkan deployment awal satu replica.
 - [ ] Mengaktifkan dan memverifikasi buat/resume sesi, polling status, kesiapan model, dan akhiri sesi terhadap RunPod nyata.
 - [x] Membedakan stop dan terminate pada implementasi awal: hanya stop tersedia dan status publik menandai `terminateImplemented: false`.
 - [ ] Menambahkan terminate hanya setelah data Network Volume diverifikasi dari proses baru dan operasi hapus mendapat batas tersendiri.
@@ -335,6 +339,14 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Rekonsiliasi Pod, operation ID, nama Pod deterministik, checkpoint mutation ambigu, batas harga/biaya, hard deadline, retry stop, dan verifikasi terminal lulus dengan fake RunPod.
 - Web UI menampilkan strategi storage, limit, feature lock, dan blocker. Tombol mutation belum ditampilkan.
 - Pengawas masih berupa controller yang harus dipanggil oleh scheduler. Deployment selalu aktif dan siklus GPU nyata belum dikerjakan.
+
+**Hasil paket watchdog tanpa saldo, 21 September 2026:**
+
+- Command `npm run runpod:watchdog` berjalan sukses dan menghasilkan `skipped_writes_disabled`, fase `off`, tanpa Pod ID atau mutation.
+- Dua belas instance store yang menulis bersamaan menghasilkan 12 revisi lengkap; tidak ada update yang hilang dan lock dibersihkan.
+- Lock file sisa proses mati dipulihkan secara atomik setelah 60 detik. State lease operasi berlaku 120 detik.
+- Controller baru setelah simulasi process restart mengadopsi Pod dengan nama deterministik tanpa create kedua; hasil yang tetap ambigu berhenti untuk rekonsiliasi manual.
+- Template systemd belum diinstal. `cloudWatchdogDeployed` tetap `false` sampai host selalu aktif, persistent directory, monitoring, dan satu replica tersedia.
 
 ## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
@@ -403,10 +415,11 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Persiapan kredensial Fase 5 selesai: API key `Restricted` baca saja dibuat dan disimpan hanya di `.env.local`.                                                                                                                | GraphQL read-only dan REST API v2 `GET /pods` berhasil, menghasilkan 0 Pod; Git mengabaikan `.env.local`, tidak ada mutation atau resource berbayar.                                                                 | Rekomendasi berikutnya adalah client REST API v2 untuk inventaris Pod, katalog GPU/data center, harga, dan dry-run. Izin tulis tetap dinonaktifkan sampai pengaman biaya selesai.                                                                                                  |
 | 21 September 2026 | Fase 5.0 selesai: client REST API v2 GET-only, endpoint terautentikasi, cache snapshot, planner dry-run, dan panel RunPod di Sesi GPU tersedia. Race condition inisialisasi storage pada request API paralel juga diperbaiki. | 27/27 tes Node, TypeScript, ESLint, build produksi, endpoint nyata, serta UI desktop/ponsel lulus; [Application checks run 35603569305](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35603569305) sukses. Akun tetap 0 Pod; dry-run Secure RTX 4090 `$0.74` menghasilkan `resourceCreated: false` dan blocker storage/izin. | Saldo masih $0,00, storage belum dipilih, key tetap baca saja, dan ketersediaan GPU berubah antar-snapshot. Rekomendasi berikutnya adalah memilih storage/data center dan merancang operasi create/stop idempotent di balik feature flag tanpa menaikkan izin key terlebih dahulu. |
 | 21 September 2026 | Fase 5.1A selesai tanpa saldo: strategi Standard Network Volume 30 GB dipilih; gateway dan state machine create/resume/stop dibuat di balik feature flag nonaktif. | 36/36 tes Node membuktikan lock sebelum jaringan, payload mount, idempotency, timeout create ambigu, lease persisten, rekonsiliasi, batas biaya, deadline, backoff, dan stop terminal. TypeScript, ESLint, build produksi, serta [Application checks run 35606701728](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35606701728) lulus; akun tetap 0 Pod dan tidak ada mutation nyata. | Volume/data center aktual, izin tulis, scheduler cloud, dan siklus GPU tetap menunggu. Rekomendasi berikutnya tanpa saldo adalah mengemas watchdog sebagai command scheduler-ready serta menetapkan single-writer deployment atau datastore dengan compare-and-swap; saldo diperlukan saat membuat Network Volume atau Pod pertama. |
+| 21 September 2026 | Fase 5.1B selesai tanpa saldo: watchdog dikemas sebagai command scheduler, state memakai mutex lintas proses, dan deployment awal ditetapkan satu replica. | 39/39 tes Node lulus, termasuk 12 writer paralel, stale-lock recovery, serta restart/adopsi setelah create timeout; command aktual menghasilkan `skipped_writes_disabled`. | Scheduler belum dideploy dan idle shutdown belum terhubung ke aktivitas job. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2A: state pekerjaan aktif, idle deadline, dan perpanjangan deadline dengan fake worker/RunPod. |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** kemas `runWatchdog()` sebagai command yang dapat dipanggil scheduler, lalu pilih deployment single-writer atau datastore dengan compare-and-swap agar lease aman pada lebih dari satu proses. Dokumentasikan dan uji pengawas yang selalu aktif dengan fake RunPod. Pekerjaan ini tidak membutuhkan perubahan key atau resource berbayar.
+**Rekomendasi selama saldo RunPod masih $0,00:** kerjakan Fase 5.2A dengan menghubungkan status pekerjaan aktif ke idle deadline, menahan idle shutdown selama antrean/running job masih ada, dan membuat perpanjangan sesi memperbarui deadline secara atomik. Semua jalur dapat diuji dengan fake worker dan fake RunPod.
 
 Sesudah saldo tersedia, buat Network Volume 30 GB pada data center yang mendukung GPU terpilih, baca ulang harga dan ketersediaan, konfirmasi batas `$1.00` serta durasi uji, lalu naikkan izin key hanya untuk create/start/stop. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 

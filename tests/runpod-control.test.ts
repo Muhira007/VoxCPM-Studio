@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -15,6 +22,7 @@ import {
   type RunpodControllerConfig,
 } from "../src/server/runpod-controller.ts";
 import { RunpodControlStore } from "../src/server/runpod-control-store.ts";
+import { runRunpodWatchdogOnce } from "../src/server/runpod-watchdog-runner.ts";
 
 const image =
   "ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd";
@@ -334,8 +342,67 @@ test("controller never repeats a create while its network outcome is unknown", a
       failed.operations[0].mutationAttemptedAt,
       "2026-09-21T01:00:00.000Z",
     );
-    await assert.rejects(controller.start(input), /outcome is still unknown/);
+    const restartedController = new RunpodController({
+      store: new RunpodControlStore(directory),
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+    });
+    await assert.rejects(
+      restartedController.start(input),
+      /outcome is still unknown/,
+    );
     assert.equal(gateway.createCalls, 1);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("restarted controller adopts a Pod that appears after an ambiguous create", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    class VisibleAmbiguousCreateGateway extends FakeGateway {
+      override async createPod(
+        input: CreateRunpodPodInput,
+      ): Promise<ManagedRunpodPod> {
+        this.createCalls += 1;
+        this.pods = [
+          managedPod("PROVISIONING", {
+            name: input.name,
+            image: input.image,
+            gpuId: input.gpuId,
+          }),
+        ];
+        throw new Error("simulated lost create response");
+      }
+    }
+    const gateway = new VisibleAmbiguousCreateGateway();
+    const dependencies = {
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+    };
+    const input = {
+      operationId: "operation_restart_0001",
+      profileId: "3090" as const,
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    };
+    await assert.rejects(
+      new RunpodController({ store, ...dependencies }).start(input),
+      /lost create response/,
+    );
+
+    const recovered = await new RunpodController({
+      store: new RunpodControlStore(directory),
+      ...dependencies,
+    }).start(input);
+    assert.equal(gateway.createCalls, 1);
+    assert.equal(recovered.session.podId, "pod-test-001");
+    assert.equal(recovered.session.phase, "provisioning");
+    assert.equal(recovered.operations[0].status, "succeeded");
   } finally {
     await removeTemporary(directory);
   }
@@ -469,15 +536,66 @@ test("disabled controller status remains reviewable and watchdog performs no cal
     });
 
     const status = await controller.status();
-    const state = await controller.runWatchdog();
+    const summary = await runRunpodWatchdogOnce(
+      controller,
+      () => new Date("2026-09-21T02:00:00.000Z"),
+    );
     assert.equal(status.writeEnabled, false);
     assert.equal(status.storage.strategy, "network-volume");
     assert.equal(status.storage.estimatedMonthlyUsd, 2.1);
     assert.equal(status.safeguards.terminateImplemented, false);
     assert.equal(status.safeguards.cloudWatchdogDeployed, false);
     assert.ok(status.blockers.some((item) => item.includes("WRITE_ENABLED")));
-    assert.equal(state.session.phase, "off");
+    assert.equal(summary.action, "skipped_writes_disabled");
+    assert.equal(summary.phase, "off");
+    assert.equal(summary.ranAt, "2026-09-21T02:00:00.000Z");
     assert.equal(gateway.stopCalls, 0);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("independent control stores serialize transactions with a file lock", async () => {
+  const { directory } = await temporaryStore();
+  try {
+    const stores = Array.from(
+      { length: 12 },
+      () => new RunpodControlStore(directory),
+    );
+    await Promise.all(
+      stores.map((store, index) =>
+        store.mutate(async (state) => {
+          await new Promise((resolveWait) => setTimeout(resolveWait, 2));
+          state.session.message += `|writer-${index}`;
+        }),
+      ),
+    );
+
+    const state = await new RunpodControlStore(directory).read();
+    assert.equal(state.revision, 12);
+    for (let index = 0; index < stores.length; index += 1)
+      assert.match(state.session.message, new RegExp(`\\|writer-${index}`));
+    assert.deepEqual(await readdir(directory), ["runpod-control.json"]);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("control store recovers a stale lock left by a dead process", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    await store.read();
+    const lockFile = join(directory, "runpod-control.lock");
+    await writeFile(lockFile, '{"owner":"dead-process"}\n', "utf8");
+    const stale = new Date(Date.now() - 120_000);
+    await utimes(lockFile, stale, stale);
+
+    const recovered = new RunpodControlStore(directory);
+    await recovered.mutate((state) => {
+      state.session.message = "Recovered after stale file lock.";
+    });
+    assert.equal((await recovered.read()).revision, 1);
+    await assert.rejects(readFile(lockFile, "utf8"), /ENOENT/);
   } finally {
     await removeTemporary(directory);
   }
