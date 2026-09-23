@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Muhira007/VoxCPM-Studio/blob/main/docs/bebas-v1-script-package.schema.json",
+  "title": "VoxCPM Studio BEBAS Script Package v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "expressionDialect",
+    "script",
+    "caption"
+  ],
+  "properties": {
+    "schema": { "const": "voxcpm-studio-script" },
+    "version": { "const": 1 },
+    "expressionDialect": { "const": "bebas-v1" },
+    "script": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "caption": { "type": "string", "maxLength": 20000 }
+  },
+  "additionalProperties": true
+}

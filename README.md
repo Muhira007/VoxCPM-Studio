@@ -37,7 +37,7 @@ Preflight operasi berbayar tersedia melalui `npm run runpod:preflight`. Command 
 
 | Halaman       | Perilaku saat ini                                                                                                                                                                                |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Studio        | Editor 5.000 karakter, empat mode, gaya bicara, serta kompiler 11 tag ekspresi `bebas-v1`; pekerjaan ekspresif diproses berurutan dengan status dan retry per segmen.                            |
+| Studio        | Editor 5.000 karakter, impor JSON dari BEBAS, empat mode, gaya bicara, serta kompiler 11 tag ekspresi `bebas-v1`; pekerjaan ekspresif diproses berurutan dengan status dan retry per segmen.      |
 | Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman.                                                                            |
 | Riwayat       | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah.                                                                                                     |
 | Sesi GPU      | Simulasi provisioning tetap lokal. Panel API menampilkan inventaris, dry-run, storage, batas biaya, idle timeout, jumlah job aktif/antri, ledger estimasi biaya, dan status kunci operasi cloud. |
@@ -51,6 +51,8 @@ Urutan mencoba:
 4. Lihat status di Hasil audio dan Riwayat. Status **Demo selesai** berarti alur simulasi selesai. Tombol unduh tetap nonaktif karena tidak ada audio hasil sintesis.
 5. Di Pengaturan, ubah Skenario demo untuk mencoba GPU tidak tersedia, pemuatan lambat, sintesis gagal, atau koneksi terputus. Kembalikan ke Normal untuk mencoba lagi.
 6. Akhiri sesi melalui Sesi GPU. Draft dan referensi tetap tersimpan.
+
+Untuk memindahkan hasil Script Generator BEBAS, pilih **Ekspor VoxCPM JSON** di BEBAS, lalu pilih **Impor BEBAS JSON** di bawah editor Studio. Tombol ekspor saat ini tersedia pada source development BEBAS; installer BEBAS 10.1.1 dibuat lebih awal dan belum memuatnya. Importer menerima kontrak `voxcpm-studio-script` versi 1 dan memuat field `script`; field `caption` tetap merupakan caption postingan dan tidak ikut dibacakan. Spesifikasi serta contoh tersedia di [kontrak paket BEBAS v1](docs/bebas-v1-script-package.md).
 
 ## Penyimpanan dan batas demo
 
@@ -77,7 +79,7 @@ npm test
 npm run build
 ```
 
-Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup parser dan whitelist ekspresi BEBAS, batas 50 segmen, status dan retry per segmen, normalisasi serta penggabungan WAV sintetis, pemakaian ulang referensi cloning, persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, blocker dry-run, feature lock sebelum jaringan, rekonsiliasi create/resume, deadline berbasis workload, perpanjangan atomik, backoff, dan verifikasi stop.
+Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup kontrak dan batas impor JSON BEBAS, parser dan whitelist ekspresi, batas 50 segmen, status dan retry per segmen, normalisasi serta penggabungan WAV sintetis, pemakaian ulang referensi cloning, persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, blocker dry-run, feature lock sebelum jaringan, rekonsiliasi create/resume, deadline berbasis workload, perpanjangan atomik, backoff, dan verifikasi stop.
 
 Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, naskah tiga ekspresi, status setiap segmen, retry satu segmen, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu pada mode simulasi. Fake runtime membentuk tiga WAV PCM dengan satu referensi cloning yang sama, lalu membuktikan hasil gabungan 0,45 detik dan regenerasi hanya pada segmen pilihan. Container simulasi sebelumnya lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
 

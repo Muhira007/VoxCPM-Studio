@@ -13,10 +13,15 @@ import {
   Play,
   Plus,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { readAudio } from "@/lib/audio-storage";
+import {
+  MAX_BEBAS_PACKAGE_BYTES,
+  parseBebasScriptPackage,
+} from "@/lib/bebas-script-package";
 import { compileExpressionScript } from "@/lib/expression-script";
 import {
   EXAMPLE_TEXT,
@@ -40,6 +45,7 @@ export function StudioPage() {
   const [upload, setUpload] = useState(false);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const bebasImportInput = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const referenceMode = draft.mode === "clone" || draft.mode === "hifi";
   const selectedVoice = state.voices.find(
@@ -52,6 +58,29 @@ export function StudioPage() {
     session.status,
   );
   const expressionScript = compileExpressionScript(draft.text);
+  async function importBebasPackage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError("");
+    try {
+      if (file.size > MAX_BEBAS_PACKAGE_BYTES)
+        throw new Error("Paket BEBAS tidak valid: ukuran JSON melebihi 64 KB.");
+      const imported = parseBebasScriptPackage(await file.text());
+      service.updateDraft({ text: imported.script });
+      toast(
+        imported.caption
+          ? "Naskah BEBAS dimuat. Caption postingan tidak ikut dibacakan."
+          : "Naskah BEBAS dimuat.",
+      );
+    } catch (problem) {
+      setError(
+        problem instanceof Error
+          ? problem.message
+          : "Paket BEBAS tidak dapat dibaca.",
+      );
+    }
+  }
   async function primaryAction() {
     setError("");
     try {
@@ -180,6 +209,21 @@ export function StudioPage() {
                   <Sparkles size={15} />
                   Contoh ekspresi
                 </button>
+                <button
+                  className="text-button"
+                  onClick={() => bebasImportInput.current?.click()}
+                >
+                  <Upload size={15} />
+                  Impor BEBAS JSON
+                </button>
+                <input
+                  ref={bebasImportInput}
+                  className="sr-only"
+                  type="file"
+                  accept="application/json,.json"
+                  aria-label="Pilih paket JSON BEBAS"
+                  onChange={(event) => void importBebasPackage(event)}
+                />
               </div>
               <span id="script-count">
                 {draft.text.length.toLocaleString("id-ID")} / 5.000 karakter
