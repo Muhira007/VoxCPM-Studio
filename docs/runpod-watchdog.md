@@ -58,6 +58,7 @@ Perintah instalasi di atas belum dijalankan. Timer baru boleh diaktifkan setelah
 
 ## Checklist sebelum operasi berbayar
 
+- `npm run runpod:preflight -- --require-ready` lulus dengan `readyForPaidCycle: true` dan `mutationAttempted: false`.
 - `npm run runpod:watchdog` berjalan sukses dengan `RUNPOD_WRITE_ENABLED=false`.
 - Aplikasi dan timer memakai persistent `VOXCPM_DATA_DIR` yang sama.
 - Hanya satu replica aplikasi yang dapat menulis state.

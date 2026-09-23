@@ -2,6 +2,10 @@ import { resolve } from "node:path";
 
 const projectRoot = process.cwd();
 
+function environmentFlag(name: string): boolean {
+  return process.env[name]?.trim().toLowerCase() === "true";
+}
+
 export const serverConfig = {
   dataDir: resolve(
     /* turbopackIgnore: true */ projectRoot,
@@ -19,13 +23,30 @@ export const serverConfig = {
   runpodWorkerImage:
     process.env.RUNPOD_WORKER_IMAGE ||
     "ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd",
-  runpodWriteEnabled: process.env.RUNPOD_WRITE_ENABLED === "true",
+  runpodWriteEnabled: environmentFlag("RUNPOD_WRITE_ENABLED"),
   runpodCloud: process.env.RUNPOD_CLOUD || "SECURE",
   runpodDataCenterId: process.env.RUNPOD_DATA_CENTER_ID || "",
   runpodNetworkVolumeId: process.env.RUNPOD_NETWORK_VOLUME_ID || "",
   runpodHardCostLimitUsd: Number(process.env.RUNPOD_HARD_COST_LIMIT_USD || "1"),
   runpodMaxSessionMinutes: Number(
     process.env.RUNPOD_MAX_SESSION_MINUTES || "240",
+  ),
+  runpodWriteScopeConfirmed: environmentFlag("RUNPOD_WRITE_SCOPE_CONFIRMED"),
+  runpodBalanceConfirmed: environmentFlag("RUNPOD_BALANCE_CONFIRMED"),
+  runpodSingleReplicaConfirmed: environmentFlag(
+    "RUNPOD_SINGLE_REPLICA_CONFIRMED",
+  ),
+  runpodPersistentStateConfirmed: environmentFlag(
+    "RUNPOD_PERSISTENT_STATE_CONFIRMED",
+  ),
+  runpodWatchdogDeployed: environmentFlag("RUNPOD_WATCHDOG_DEPLOYED"),
+  runpodStopAlertConfigured: environmentFlag("RUNPOD_STOP_ALERT_CONFIGURED"),
+  runpodPreflightProfileId: process.env.RUNPOD_PREFLIGHT_PROFILE_ID || "3090",
+  runpodPreflightDurationMinutes: Number(
+    process.env.RUNPOD_PREFLIGHT_DURATION_MINUTES || "30",
+  ),
+  runpodPreflightMaxHourlyRate: Number(
+    process.env.RUNPOD_PREFLIGHT_MAX_HOURLY_RATE || "0.80",
   ),
 };
 
@@ -89,5 +110,17 @@ export function validateRunpodWriteConfiguration(): string[] {
     errors.push("RUNPOD_HARD_COST_LIMIT_USD must be between 0 and 25.");
   if (![30, 60, 120, 240].includes(serverConfig.runpodMaxSessionMinutes))
     errors.push("RUNPOD_MAX_SESSION_MINUTES must be 30, 60, 120, or 240.");
+  if (!serverConfig.runpodWriteScopeConfirmed)
+    errors.push("RUNPOD_WRITE_SCOPE_CONFIRMED is false.");
+  if (!serverConfig.runpodBalanceConfirmed)
+    errors.push("RUNPOD_BALANCE_CONFIRMED is false.");
+  if (!serverConfig.runpodSingleReplicaConfirmed)
+    errors.push("RUNPOD_SINGLE_REPLICA_CONFIRMED is false.");
+  if (!serverConfig.runpodPersistentStateConfirmed)
+    errors.push("RUNPOD_PERSISTENT_STATE_CONFIRMED is false.");
+  if (!serverConfig.runpodWatchdogDeployed)
+    errors.push("RUNPOD_WATCHDOG_DEPLOYED is false.");
+  if (!serverConfig.runpodStopAlertConfigured)
+    errors.push("RUNPOD_STOP_ALERT_CONFIGURED is false.");
   return errors;
 }

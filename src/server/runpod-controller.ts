@@ -53,6 +53,12 @@ export interface RunpodControllerConfig {
   networkVolumeId: string;
   hardCostLimitUsd: number;
   maximumSessionMinutes: number;
+  writeScopeConfirmed: boolean;
+  balanceConfirmed: boolean;
+  singleReplicaConfirmed: boolean;
+  persistentStateConfirmed: boolean;
+  watchdogDeployed: boolean;
+  stopAlertConfigured: boolean;
 }
 
 export interface RunpodStartInput {
@@ -164,6 +170,12 @@ function defaultConfig(): RunpodControllerConfig {
     networkVolumeId: serverConfig.runpodNetworkVolumeId,
     hardCostLimitUsd: serverConfig.runpodHardCostLimitUsd,
     maximumSessionMinutes: serverConfig.runpodMaxSessionMinutes,
+    writeScopeConfirmed: serverConfig.runpodWriteScopeConfirmed,
+    balanceConfirmed: serverConfig.runpodBalanceConfirmed,
+    singleReplicaConfirmed: serverConfig.runpodSingleReplicaConfirmed,
+    persistentStateConfirmed: serverConfig.runpodPersistentStateConfirmed,
+    watchdogDeployed: serverConfig.runpodWatchdogDeployed,
+    stopAlertConfigured: serverConfig.runpodStopAlertConfigured,
   };
 }
 
@@ -332,11 +344,7 @@ export class RunpodController {
   }
 
   private writeConfigurationErrors(): string[] {
-    const errors: string[] = [];
-    if (!this.config.writeEnabled)
-      errors.push("RUNPOD_WRITE_ENABLED is false.");
-    if (this.config.apiKey.length < 32)
-      errors.push("RUNPOD_API_KEY is not configured for the control plane.");
+    const errors = this.stopConfigurationErrors();
     if (this.config.workerApiKey.length < 32)
       errors.push("WORKER_API_KEY is not configured for the GPU worker.");
     if (!["community", "secure"].includes(this.config.cloud))
@@ -355,6 +363,27 @@ export class RunpodController {
       errors.push("The RunPod hard cost limit is invalid.");
     if (![30, 60, 120, 240].includes(this.config.maximumSessionMinutes))
       errors.push("The RunPod maximum session duration is invalid.");
+    if (!this.config.writeScopeConfirmed)
+      errors.push("RUNPOD_WRITE_SCOPE_CONFIRMED is false.");
+    if (!this.config.balanceConfirmed)
+      errors.push("RUNPOD_BALANCE_CONFIRMED is false.");
+    if (!this.config.singleReplicaConfirmed)
+      errors.push("RUNPOD_SINGLE_REPLICA_CONFIRMED is false.");
+    if (!this.config.persistentStateConfirmed)
+      errors.push("RUNPOD_PERSISTENT_STATE_CONFIRMED is false.");
+    if (!this.config.watchdogDeployed)
+      errors.push("RUNPOD_WATCHDOG_DEPLOYED is false.");
+    if (!this.config.stopAlertConfigured)
+      errors.push("RUNPOD_STOP_ALERT_CONFIGURED is false.");
+    return errors;
+  }
+
+  private stopConfigurationErrors(): string[] {
+    const errors: string[] = [];
+    if (!this.config.writeEnabled)
+      errors.push("RUNPOD_WRITE_ENABLED is false.");
+    if (this.config.apiKey.length < 32)
+      errors.push("RUNPOD_API_KEY is not configured for the control plane.");
     return errors;
   }
 
@@ -363,14 +392,15 @@ export class RunpodController {
     if (errors.length) throw new ApiError(423, errors[0]);
   }
 
+  private assertStopConfiguration() {
+    const errors = this.stopConfigurationErrors();
+    if (errors.length) throw new ApiError(423, errors[0]);
+  }
+
   async status(): Promise<RunpodControlStatus> {
     const state = await this.store.read();
     const observedAt = this.now();
     const blockers = this.writeConfigurationErrors();
-    blockers.push(
-      "Pengawas deadline belum dideploy pada layanan cloud yang selalu aktif.",
-    );
-    blockers.push("Siklus GPU nyata belum diverifikasi dengan saldo RunPod.");
     return {
       writeEnabled: this.config.writeEnabled,
       liveMutationAttempted: state.operations.some((operation) =>
@@ -406,6 +436,10 @@ export class RunpodController {
         crossProcessFileLock: true,
         schedulerCommandReady: true,
         singleReplicaRequired: true,
+        singleReplicaConfirmed: this.config.singleReplicaConfirmed,
+        persistentStateConfirmed: this.config.persistentStateConfirmed,
+        writeScopeConfirmed: this.config.writeScopeConfirmed,
+        balanceConfirmed: this.config.balanceConfirmed,
         reconcileBeforeCreate: true,
         hardDeadline: true,
         workloadAwareIdleDeadline: true,
@@ -414,7 +448,8 @@ export class RunpodController {
         persistedCostLedger: true,
         verifiedStopRequired: true,
         terminateImplemented: false,
-        cloudWatchdogDeployed: false,
+        cloudWatchdogDeployed: this.config.watchdogDeployed,
+        stopAlertConfigured: this.config.stopAlertConfigured,
       },
       blockers,
     };
@@ -422,6 +457,7 @@ export class RunpodController {
 
   async assertJobAdmission(): Promise<void> {
     if (!this.config.writeEnabled) return;
+    this.assertWriteConfiguration();
     const state = await this.store.read();
     if (state.session.phase !== "ready")
       throw new ApiError(409, "The RunPod worker is not ready for a new job.");
@@ -944,7 +980,7 @@ export class RunpodController {
   }
 
   async stop(input: RunpodStopInput): Promise<RunpodControlState> {
-    this.assertWriteConfiguration();
+    this.assertStopConfiguration();
     if (!validOperationId(input.operationId))
       throw new ApiError(422, "The RunPod idempotency key is invalid.");
     const kind = input.kind ?? "stop";

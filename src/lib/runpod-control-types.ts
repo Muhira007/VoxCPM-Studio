@@ -127,6 +127,10 @@ export interface RunpodControlStatus {
     crossProcessFileLock: true;
     schedulerCommandReady: true;
     singleReplicaRequired: true;
+    singleReplicaConfirmed: boolean;
+    persistentStateConfirmed: boolean;
+    writeScopeConfirmed: boolean;
+    balanceConfirmed: boolean;
     reconcileBeforeCreate: true;
     hardDeadline: true;
     workloadAwareIdleDeadline: true;
@@ -135,7 +139,8 @@ export interface RunpodControlStatus {
     persistedCostLedger: true;
     verifiedStopRequired: true;
     terminateImplemented: false;
-    cloudWatchdogDeployed: false;
+    cloudWatchdogDeployed: boolean;
+    stopAlertConfigured: boolean;
   };
   blockers: string[];
 }

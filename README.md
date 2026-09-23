@@ -31,6 +31,8 @@ Strategi persisten yang dipilih adalah **Standard Network Volume 30 GB** pada `/
 
 Watchdog scheduler dapat dijalankan sekali dengan `npm run runpod:watchdog`. State store memakai file lock lintas proses dan pemulihan lock basi, sehingga aplikasi serta scheduler pada satu host dan persistent directory yang sama tidak menimpa state. Perpanjangan 30 menit disimpan atomik dan idempoten, serta ditolak jika drain sudah dimulai, durasi maksimum terlewati, atau hard cost limit terlampaui. Panel RunPod memperbarui countdown hard/idle deadline dan alasan stop setiap sepuluh detik. Panel yang sama menampilkan ledger estimasi compute untuk startup/loading, job aktif, idle, shutdown/error, serta exposure sampai hard deadline. Storage bulanan ditampilkan terpisah dan belum dikenakan selama Network Volume belum dibuat. Model deployment awal dibatasi ke satu replica; lihat [runbook watchdog](docs/runpod-watchdog.md) dan template systemd di `deploy/systemd/`.
 
+Preflight operasi berbayar tersedia melalui `npm run runpod:preflight`. Command ini hanya membaca konfigurasi, permission direktori state, inventaris, katalog, harga, dan data center. Output JSON memuat `readyForPaidCycle`, check terstruktur, serta blocker tanpa rahasia. Controller mewajibkan konfirmasi saldo, scope key, satu replica, persistent state, watchdog, dan alert sebelum start, perpanjangan, atau admission job baru. Stop darurat tetap tersedia ketika write gateway dan API key valid. Lihat [runbook preflight](docs/runpod-preflight.md) dan [template bukti siklus pertama](docs/runpod-first-cycle-evidence.md).
+
 ## Fitur yang bisa dicoba
 
 | Halaman       | Perilaku saat ini                                                                                                                                                                                |
@@ -87,6 +89,8 @@ Integrasi baca saja kemudian diverifikasi end-to-end melalui endpoint dan UI: ak
 
 Control plane berikutnya sudah diimplementasikan tanpa mutation nyata. State disimpan atomik di `.data/runpod-control.json`; create/resume/stop memerlukan idempotency key dan lease, selalu merekonsiliasi inventaris, memeriksa harga serta batas biaya, lalu memakai deadline absolut. Watchdog menyinkronkan status job backend, meniadakan idle deadline selama ada job running/queued, menutup admission dan meminta pembatalan job pada jendela drain lima menit, serta menyimpan alasan stop. Endpoint kontrol juga menerima perpanjangan 30 menit yang atomik dan idempoten. Ledger waktu persisten diperbarui pada transisi sesi dan aktivitas job, lalu mengubah detik per kategori menjadi estimasi biaya memakai tarif sesi. Fake RunPod membuktikan bahwa retry tidak membuat Pod ganda, hasil create yang timeout tidak dikirim ulang sebelum rekonsiliasi, Pod `EXITED` di-resume, hard deadline tidak bergantung pada snapshot workload atau keberhasilan cancel worker, kegagalan stop memakai backoff, dan `stopConfirmedAt` hanya terisi setelah `EXITED` atau `TERMINATED`. Default `RUNPOD_WRITE_ENABLED=false` menolak seluruh `POST` upstream sebelum `fetch` dipanggil. Ledger belum boleh dianggap sebagai invoice sampai dibandingkan dengan tagihan siklus GPU nyata.
 
+Preflight aktual dengan write lock aktif membaca inventaris `0` Pod dan snapshot Secure RTX 3090 `$0.50/jam` tanpa mutation. Rencana 30 menit menghasilkan estimasi compute `$0.25`, masih di bawah hard cost limit `$1.00`, tetapi `readyForPaidCycle` tetap `false` sampai saldo, volume/data center, scope key, deployment satu replica, persistent state, watchdog, dan alert telah dibuktikan.
+
 Pemeriksaan UI manual mencakup desktop dan ponsel, input tidak valid, unggah WAV, pemutaran setelah refresh, cloning demo, pembatalan, riwayat, dan fokus dialog. Rincian hasil ada di [progress.md](progress.md).
 
 ## Struktur kode
@@ -106,7 +110,9 @@ src/server/               Persistensi, validasi, autentikasi, dan client worker
 src/server/runpod-client.ts Client REST API v2 GET-only dan planner lokal
 src/server/runpod-controller.ts State machine, lease, workload, deadline, dan rekonsiliasi Pod
 src/server/runpod-control-gateway.ts Gateway create/start/stop dengan feature lock
+src/server/runpod-preflight.ts Gate kesiapan operasi berbayar tanpa mutation
 src/server/runpod-watchdog-runner.ts Ringkasan eksekusi watchdog sekali jalan
+scripts/runpod-preflight.ts Command JSON preflight sekali jalan
 src/app/api/v1/           Route Handler API aplikasi
 worker/app/               Worker FastAPI mode simulasi dan adapter VoxCPM2
 worker/Dockerfile.gpu     Image GPU RunPod dengan versi model/dependensi terkunci

@@ -39,6 +39,12 @@ const config: RunpodControllerConfig = {
   networkVolumeId: "volume_test_001",
   hardCostLimitUsd: 1,
   maximumSessionMinutes: 240,
+  writeScopeConfirmed: true,
+  balanceConfirmed: true,
+  singleReplicaConfirmed: true,
+  persistentStateConfirmed: true,
+  watchdogDeployed: true,
+  stopAlertConfigured: true,
 };
 
 function idleWorkload(value: Partial<RunpodWorkloadSnapshot> = {}): {
@@ -307,6 +313,57 @@ test("controller creates once, reconciles readiness, and verifies stop", async (
   }
 });
 
+test("controller keeps emergency stop available when readiness attestations are revoked", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const gateway = new FakeGateway();
+    const startController = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => new Date("2026-09-21T01:00:00.000Z"),
+    });
+    await startController.start({
+      operationId: "operation_guarded_start",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+
+    const stopController = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config: {
+        ...config,
+        workerImage: "mutable-image:latest",
+        workerApiKey: "",
+        dataCenterId: "",
+        networkVolumeId: "",
+        hardCostLimitUsd: Number.NaN,
+        maximumSessionMinutes: 17,
+        writeScopeConfirmed: false,
+        balanceConfirmed: false,
+        singleReplicaConfirmed: false,
+        persistentStateConfirmed: false,
+        watchdogDeployed: false,
+        stopAlertConfigured: false,
+      },
+      now: () => new Date("2026-09-21T01:01:00.000Z"),
+    });
+    const stopped = await stopController.stop({
+      operationId: "operation_emergency_stop",
+    });
+
+    assert.equal(gateway.stopCalls, 1);
+    assert.equal(stopped.session.phase, "stopped");
+    assert.equal(stopped.session.stopConfirmedAt, "2026-09-21T01:01:00.000Z");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
 test("controller resumes one exited managed Pod instead of creating another", async () => {
   const { directory, store } = await temporaryStore();
   try {
@@ -452,6 +509,23 @@ test("controller enforces live rate, data center, and hard cost before mutation"
     );
     assert.equal(gateway.createCalls, 0);
     assert.equal((await store.read()).operations.length, 0);
+
+    const readinessGate = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config: { ...config, balanceConfirmed: false },
+    });
+    await assert.rejects(
+      readinessGate.start({
+        operationId: "operation_readiness_gate",
+        profileId: "3090",
+        durationMinutes: 30,
+        maximumHourlyRate: 0.6,
+      }),
+      /RUNPOD_BALANCE_CONFIRMED/,
+    );
+    assert.equal(gateway.createCalls, 0);
   } finally {
     await removeTemporary(directory);
   }
@@ -947,6 +1021,12 @@ test("disabled controller status remains reviewable and watchdog performs no cal
         writeEnabled: false,
         dataCenterId: "",
         networkVolumeId: "",
+        writeScopeConfirmed: false,
+        balanceConfirmed: false,
+        singleReplicaConfirmed: false,
+        persistentStateConfirmed: false,
+        watchdogDeployed: false,
+        stopAlertConfigured: false,
       },
     });
 

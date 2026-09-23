@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 23 September 2026
-Status: **Fase 0–4C, integrasi baca saja, control plane, paket watchdog, admission/drain deadline, serta ledger estimasi biaya lokal Fase 5 selesai; resource GPU menunggu saldo serta volume/data center aktual.**
-Fase aktif: **Fase 5.3A — preflight operasi berbayar dan paket bukti siklus GPU pertama dapat disiapkan tanpa saldo; eksekusi cloud tetap menunggu saldo.**
+Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, serta preflight operasi berbayar lokal Fase 5 selesai; resource GPU menunggu saldo, host selalu aktif, dan volume/data center aktual.**
+Fase aktif: **Fase 5.3B — menuntaskan blocker preflight dan menjalankan siklus GPU pertama; tahap ini memerlukan saldo serta host control plane yang selalu aktif.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -376,6 +376,25 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Panel RunPod memberi label angka sebagai estimasi, memisahkan biaya Network Volume `$2.10/bulan`, dan menjelaskan bahwa storage belum dikenakan karena volume belum dibuat.
 - Uji dengan jam palsu membuktikan pembagian 120 detik startup, 120 detik job aktif, 120 detik idle, dan 60 detik shutdown pada tarif `$0.50/jam`; total serta exposure tetap konsisten dengan hard deadline. Semua verifikasi memakai fake RunPod dan write lock tetap aktif.
 
+### 5.3 Preflight dan siklus GPU pertama
+
+- [x] Menyediakan `npm run runpod:preflight` yang hanya memakai REST API v2 `GET`, memeriksa konfigurasi lokal, dan menghasilkan JSON tanpa rahasia.
+- [x] Menyediakan mode `--require-ready` untuk otomasi yang gagal ketika masih ada blocker.
+- [x] Memeriksa inventaris, image digest, profil/cloud, harga terbaru, durasi, hard cost limit, data center/volume, dan akses direktori state.
+- [x] Mewajibkan attestation saldo, scope key, satu replica, persistent state, watchdog selalu aktif, dan alert stop sebelum start, extend, atau admission job baru.
+- [x] Memastikan stop darurat tetap tersedia ketika attestation kesiapan dicabut, selama write gateway dan API key valid.
+- [x] Menyediakan runbook preflight dan template bukti siklus pertama untuk timeline, persistensi output, shutdown, serta rekonsiliasi invoice.
+- [ ] Menyelesaikan seluruh blocker sampai preflight aktual menghasilkan `readyForPaidCycle: true`.
+- [ ] Menjalankan dan mendokumentasikan satu siklus GPU nyata sesuai template bukti.
+
+**Hasil Fase 5.3A tanpa saldo, 23 September 2026:**
+
+- Preflight aktual berhasil membaca `0` Pod tanpa mutation. Snapshot Secure RTX 3090 menunjukkan `$0.50/jam`, availability `LOW`, dan estimasi compute 30 menit `$0.25` terhadap hard cost limit `$1.00`.
+- `readyForPaidCycle` tetap `false` dengan sembilan blocker yang tepat: write lock, scope key, saldo, Network Volume, kecocokan data center, satu replica, persistent state, watchdog cloud, dan alert stop.
+- Image immutable, inventaris kosong, API baca saja, harga, durasi, hard cost limit, serta akses direktori lokal sudah lulus.
+- Controller memakai gate yang sama untuk biaya baru. Uji regresi membuktikan konfigurasi rencana yang hilang tidak menghalangi stop darurat Pod aktif.
+- Tidak ada Pod, Network Volume, perubahan izin key, atau mutation RunPod yang dibuat.
+
 ## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
@@ -447,11 +466,12 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Fase 5.2A selesai tanpa saldo: watchdog terhubung ke state job, idle shutdown menunggu antrean kosong, hard deadline tetap dominan, dan perpanjangan deadline dibuat atomik/idempoten.                                        | 43/43 tes Node lulus, termasuk workload gagal pada hard deadline, job running/queued, idle stop, batas biaya, dan retry perpanjangan tanpa duplikasi. TypeScript, ESLint, build produksi, serta [Application checks run 35609279751](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35609279751) lulus; tidak ada mutation RunPod nyata.                                                | Scheduler serta siklus GPU nyata tetap menunggu saldo/host. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2B: admission cutoff, drain/cancel job aktif menjelang hard deadline, serta countdown dan alasan stop pada UI.                                                                                                         |
 | 23 September 2026 | Fase 5.2B selesai tanpa saldo: admission ditutup lima menit sebelum hard deadline, drain membatalkan job aktif secara idempoten, dan UI menampilkan countdown serta alasan stop.                                              | 44/44 tes Node dan 7/7 tes worker lulus, termasuk drain satu kali, kegagalan cancel worker, penolakan admission, dan hard stop yang tetap dominan. TypeScript, ESLint, build produksi, UI ponsel, serta [Application checks run 35828868692](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35828868692) lulus; tidak ada mutation RunPod nyata.                                        | Cutoff belum dikalibrasi dengan durasi inferensi GPU. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2C: ledger estimasi compute startup/running/idle, exposure sampai hard deadline, dan biaya storage terpisah di UI.                                                                                                           |
 | 23 September 2026 | Fase 5.2C selesai tanpa saldo: ledger waktu dan estimasi biaya compute per kategori, exposure sampai hard deadline, serta storage bulanan terpisah tersedia pada state, watchdog, dan UI.                                     | 46/46 tes Node lulus, termasuk jam palsu untuk startup/loading, job aktif, idle, shutdown/error, waktu sebelum Pod ada, total biaya, dan exposure. TypeScript, ESLint, build produksi, 7/7 tes worker, UI desktop, serta [Application checks run 35832076185](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35832076185) lulus. Tidak ada mutation RunPod nyata.                       | Angka belum dibandingkan dengan invoice RunPod. Rekomendasi berikutnya tanpa saldo adalah Fase 5.3A: command preflight operasi berbayar dan template bukti siklus pertama; eksekusi GPU tetap menunggu saldo.                                                                                                                       |
+| 23 September 2026 | Fase 5.3A selesai tanpa saldo: preflight JSON, gate attestation controller, mode otomasi, dan template bukti siklus GPU pertama tersedia.                                                                                     | 50/50 tes Node lulus, termasuk laporan siap/belum siap, sanitasi rahasia, kegagalan probe, gate saldo, dan stop darurat. TypeScript serta ESLint lulus; build, tes worker, dan CI dicatat setelah commit. Preflight aktual membaca 0 Pod dan menghasilkan `mutationAttempted: false`.                                                                                                            | Tahap lokal tanpa saldo telah mencapai gate operasi nyata. Rekomendasi berikutnya adalah Fase 5.3B: sediakan saldo dan host selalu aktif, buat volume/data center, perluas scope key minimum, lalu selesaikan preflight sebelum satu siklus berbayar terkontrol.                                                                    |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** kerjakan Fase 5.3A dengan membuat command preflight operasi berbayar yang menghasilkan laporan lulus/gagal tanpa mutation. Laporan harus memeriksa write lock, izin key yang diharapkan, image digest, satu replica, scheduler, direktori persisten, volume/data center, harga terbaru, hard cost limit, serta durasi uji. Siapkan juga template bukti siklus pertama untuk mencatat readiness, sintesis, persistensi hasil, stop terverifikasi, dan perbandingan ledger dengan invoice.
+**Rekomendasi berikutnya memerlukan saldo dan host control plane yang selalu aktif:** kerjakan Fase 5.3B dengan membuat Network Volume 30 GB pada data center yang mendukung GPU terpilih, menjalankan aplikasi/watchdog satu replica pada persistent state, menguji alert, dan menaikkan izin key hanya untuk create/start/stop. Pertahankan write lock sampai semua blocker selain `write_gateway_enabled` selesai, lalu aktifkan flag itu paling akhir dan wajibkan preflight `--require-ready` lulus.
 
-Sesudah saldo tersedia, buat Network Volume 30 GB pada data center yang mendukung GPU terpilih, baca ulang harga dan ketersediaan, konfirmasi batas `$1.00` serta durasi uji, lalu naikkan izin key hanya untuk create/start/stop. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
+Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi. Isi template bukti, bandingkan ledger dengan invoice, lalu kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.
