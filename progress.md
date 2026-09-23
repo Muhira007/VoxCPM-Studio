@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 23 September 2026
-Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, serta preflight operasi berbayar lokal Fase 5 selesai; resource GPU menunggu saldo, host selalu aktif, dan volume/data center aktual.**
-Fase aktif: **Fase 5.3B — menuntaskan blocker preflight dan menjalankan siklus GPU pertama; tahap ini memerlukan saldo serta host control plane yang selalu aktif.**
+Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, preflight operasi berbayar lokal Fase 5, serta implementasi inti ekspresi dan integrasi BEBAS Fase 6A–6C selesai; resource GPU menunggu saldo, host selalu aktif, dan volume/data center aktual.**
+Fase aktif: **Persiapan Fase 6D tanpa saldo — menyusun korpus uji Indonesia, panduan rekaman referensi, dan pemeriksaan teknis WAV sebelum validasi suara pada GPU.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -507,6 +507,6 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 
 **Rekomendasi aktif tanpa saldo:** mulai persiapan Fase 6D dengan membuat korpus 20–30 naskah uji Indonesia, panduan rekaman referensi suara, serta pemeriksaan lokal untuk format, durasi, level, clipping, dan keheningan WAV. Semua artefak tersebut dapat disiapkan sebelum inferensi GPU.
 
-Setelah kontrak impor siap, lanjutkan Fase 5.3B ketika saldo tersedia: buat Network Volume 30 GB, jalankan aplikasi/watchdog satu replica pada persistent state, selesaikan blocker preflight, lalu gunakan satu siklus berbayar terbatas untuk uji dengar dan kalibrasi ekspresi. Kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
+Setelah saldo tersedia, lanjutkan Fase 5.3B: buat Network Volume 30 GB, jalankan aplikasi/watchdog satu replica pada persistent state, selesaikan blocker preflight, lalu gunakan satu siklus berbayar terbatas untuk uji dengar dan kalibrasi ekspresi. Kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.
