@@ -17,6 +17,34 @@ export type RunpodOperationKind = "start" | "extend" | "stop" | "watchdog-stop";
 export type RunpodOperationStatus = "pending" | "succeeded" | "failed";
 export type RunpodStopReason = "manual" | "hard_deadline" | "idle_deadline";
 
+export interface RunpodCostLedger {
+  accruedAt: string | null;
+  startupSeconds: number;
+  activeSeconds: number;
+  idleSeconds: number;
+  shutdownSeconds: number;
+}
+
+export interface RunpodCostBucket {
+  seconds: number;
+  estimatedCostUsd: number;
+}
+
+export interface RunpodCostEstimate {
+  observedAt: string;
+  estimated: true;
+  hourlyRate: number | null;
+  startup: RunpodCostBucket;
+  active: RunpodCostBucket;
+  idle: RunpodCostBucket;
+  shutdown: RunpodCostBucket;
+  totalSeconds: number;
+  accruedComputeCostUsd: number;
+  remainingComputeExposureUsd: number;
+  projectedComputeCostUsd: number;
+  storageMonthlyCostUsd: number;
+}
+
 export interface RunpodControlSession {
   phase: RunpodControlPhase;
   podId: string | null;
@@ -42,6 +70,7 @@ export interface RunpodControlSession {
   cancellationRequestedAt: string | null;
   cancelledJobCount: number;
   cancellationFailureCount: number;
+  costLedger: RunpodCostLedger;
   stopRequestedAt: string | null;
   stopConfirmedAt: string | null;
   stopReason: RunpodStopReason | null;
@@ -76,6 +105,7 @@ export interface RunpodControlStatus {
   liveMutationAttempted: boolean;
   phase: RunpodControlPhase;
   session: RunpodControlSession;
+  costEstimate: RunpodCostEstimate;
   storage: {
     strategy: "network-volume";
     tier: "standard";
@@ -102,6 +132,7 @@ export interface RunpodControlStatus {
     workloadAwareIdleDeadline: true;
     hardDeadlineDrain: true;
     atomicDeadlineExtension: true;
+    persistedCostLedger: true;
     verifiedStopRequired: true;
     terminateImplemented: false;
     cloudWatchdogDeployed: false;

@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type {
+  RunpodCostLedger,
   RunpodControlSession,
   RunpodControlState,
 } from "../lib/runpod-control-types.ts";
@@ -19,6 +20,16 @@ import { serverConfig } from "./config.ts";
 const FILE_LOCK_RETRY_MILLISECONDS = 25;
 const FILE_LOCK_TIMEOUT_MILLISECONDS = 10_000;
 const FILE_LOCK_STALE_MILLISECONDS = 60_000;
+
+export function emptyRunpodCostLedger(): RunpodCostLedger {
+  return {
+    accruedAt: null,
+    startupSeconds: 0,
+    activeSeconds: 0,
+    idleSeconds: 0,
+    shutdownSeconds: 0,
+  };
+}
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
@@ -54,6 +65,7 @@ export function emptyRunpodControlSession(): RunpodControlSession {
     cancellationRequestedAt: null,
     cancelledJobCount: 0,
     cancellationFailureCount: 0,
+    costLedger: emptyRunpodCostLedger(),
     stopRequestedAt: null,
     stopConfirmedAt: null,
     stopReason: null,
@@ -87,7 +99,14 @@ function isState(value: unknown): value is RunpodControlState {
 }
 
 function normalizeState(state: RunpodControlState): RunpodControlState {
-  const session = { ...emptyRunpodControlSession(), ...state.session };
+  const session = {
+    ...emptyRunpodControlSession(),
+    ...state.session,
+    costLedger: {
+      ...emptyRunpodCostLedger(),
+      ...state.session.costLedger,
+    },
+  };
   if (!session.admissionCutoffAt && session.hardDeadline) {
     const hardDeadline = Date.parse(session.hardDeadline);
     if (Number.isFinite(hardDeadline))

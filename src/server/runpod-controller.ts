@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import type {
+  RunpodControlSession,
   RunpodControlOperation,
   RunpodControlPhase,
   RunpodControlState,
   RunpodControlStatus,
+  RunpodCostEstimate,
   RunpodOperationKind,
   RunpodStopReason,
 } from "../lib/runpod-control-types.ts";
@@ -23,6 +25,7 @@ import {
 } from "./runpod-control-gateway.ts";
 import {
   type RunpodControlStore,
+  emptyRunpodCostLedger,
   emptyRunpodControlSession,
   runpodControlStore,
 } from "./runpod-control-store.ts";
@@ -32,6 +35,7 @@ import { cancelWorkerJob } from "./worker-client.ts";
 const MANAGED_POD_PREFIX = "voxcpm-studio-";
 const MAX_STOP_FAILURES = 3;
 const LEASE_MILLISECONDS = 120_000;
+const STORAGE_MONTHLY_COST_USD = 2.1;
 
 const RUNPOD_GPU_IDS: Record<RunpodProfileId, string> = {
   a5000: "NVIDIA RTX A5000",
@@ -195,6 +199,90 @@ function admissionCutoff(deadline: number): string {
   ).toISOString();
 }
 
+type CostLedgerBucket =
+  "startupSeconds" | "activeSeconds" | "idleSeconds" | "shutdownSeconds";
+
+function costLedgerBucket(
+  session: RunpodControlSession,
+): CostLedgerBucket | null {
+  if (!session.podId || ["off", "stopped"].includes(session.phase)) return null;
+  if (
+    ["planned", "provisioning", "starting", "loading_model"].includes(
+      session.phase,
+    )
+  )
+    return "startupSeconds";
+  if (session.phase === "ready")
+    return session.runningJobCount + session.queuedJobCount > 0
+      ? "activeSeconds"
+      : "idleSeconds";
+  return "shutdownSeconds";
+}
+
+function accrueCostLedger(session: RunpodControlSession, observedAt: Date) {
+  if (!session.startedAt) return;
+  const from = Date.parse(session.costLedger.accruedAt ?? session.startedAt);
+  const until = observedAt.getTime();
+  if (!Number.isFinite(from) || until <= from) return;
+  const bucket = costLedgerBucket(session);
+  if (bucket) session.costLedger[bucket] += (until - from) / 1_000;
+  session.costLedger.accruedAt = observedAt.toISOString();
+}
+
+function roundUsd(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
+}
+
+function costEstimate(
+  session: RunpodControlSession,
+  observedAt: Date,
+): RunpodCostEstimate {
+  const projectedSession: RunpodControlSession = {
+    ...session,
+    costLedger: { ...session.costLedger },
+  };
+  accrueCostLedger(projectedSession, observedAt);
+  const rate = projectedSession.hourlyRate;
+  const bucket = (seconds: number) => ({
+    seconds,
+    estimatedCostUsd: rate === null ? 0 : roundUsd((rate * seconds) / 3_600),
+  });
+  const startup = bucket(projectedSession.costLedger.startupSeconds);
+  const active = bucket(projectedSession.costLedger.activeSeconds);
+  const idle = bucket(projectedSession.costLedger.idleSeconds);
+  const shutdown = bucket(projectedSession.costLedger.shutdownSeconds);
+  const totalSeconds =
+    startup.seconds + active.seconds + idle.seconds + shutdown.seconds;
+  const accruedComputeCostUsd =
+    rate === null ? 0 : roundUsd((rate * totalSeconds) / 3_600);
+  const deadline = projectedSession.hardDeadline
+    ? Date.parse(projectedSession.hardDeadline)
+    : Number.NaN;
+  const terminal = ["off", "stopped"].includes(projectedSession.phase);
+  const remainingSeconds =
+    !terminal && Number.isFinite(deadline)
+      ? Math.max(0, (deadline - observedAt.getTime()) / 1_000)
+      : 0;
+  const remainingComputeExposureUsd =
+    rate === null ? 0 : roundUsd((rate * remainingSeconds) / 3_600);
+  return {
+    observedAt: observedAt.toISOString(),
+    estimated: true,
+    hourlyRate: rate,
+    startup,
+    active,
+    idle,
+    shutdown,
+    totalSeconds,
+    accruedComputeCostUsd,
+    remainingComputeExposureUsd,
+    projectedComputeCostUsd: roundUsd(
+      accruedComputeCostUsd + remainingComputeExposureUsd,
+    ),
+    storageMonthlyCostUsd: STORAGE_MONTHLY_COST_USD,
+  };
+}
+
 function upsertOperation(
   state: RunpodControlState,
   operation: RunpodControlOperation,
@@ -277,6 +365,7 @@ export class RunpodController {
 
   async status(): Promise<RunpodControlStatus> {
     const state = await this.store.read();
+    const observedAt = this.now();
     const blockers = this.writeConfigurationErrors();
     blockers.push(
       "Pengawas deadline belum dideploy pada layanan cloud yang selalu aktif.",
@@ -289,12 +378,13 @@ export class RunpodController {
       ),
       phase: state.session.phase,
       session: state.session,
+      costEstimate: costEstimate(state.session, observedAt),
       storage: {
         strategy: "network-volume",
         tier: "standard",
         sizeGb: 30,
         mountPath: "/workspace",
-        estimatedMonthlyUsd: 2.1,
+        estimatedMonthlyUsd: STORAGE_MONTHLY_COST_USD,
         volumeConfigured: Boolean(this.config.networkVolumeId),
         dataCenterConfigured: Boolean(this.config.dataCenterId),
       },
@@ -321,6 +411,7 @@ export class RunpodController {
         workloadAwareIdleDeadline: true,
         hardDeadlineDrain: true,
         atomicDeadlineExtension: true,
+        persistedCostLedger: true,
         verifiedStopRequired: true,
         terminateImplemented: false,
         cloudWatchdogDeployed: false,
@@ -399,6 +490,7 @@ export class RunpodController {
       throw new ApiError(502, "The workload activity timestamp is invalid.");
     const now = this.now();
     await this.store.mutate((state) => {
+      accrueCostLedger(state.session, now);
       state.session.runningJobCount = workload.runningJobCount;
       state.session.queuedJobCount = workload.queuedJobCount;
       state.session.lastActivityAt = workload.lastActivityAt;
@@ -425,6 +517,22 @@ export class RunpodController {
       ).toISOString();
     });
     return await this.store.read();
+  }
+
+  async observeWorkloadBestEffort(): Promise<boolean> {
+    if (!this.config.writeEnabled) return false;
+    const state = await this.store.read();
+    if (
+      !state.session.podId ||
+      ["off", "stopped"].includes(state.session.phase)
+    )
+      return false;
+    try {
+      await this.syncWorkload();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private matchingOperation(
@@ -518,6 +626,7 @@ export class RunpodController {
         );
       const timestamp = this.now().toISOString();
       await this.store.mutate((state) => {
+        accrueCostLedger(state.session, new Date(timestamp));
         state.session.hardDeadline = new Date(nextDeadline).toISOString();
         state.session.admissionCutoffAt = admissionCutoff(nextDeadline);
         upsertOperation(state, {
@@ -648,6 +757,10 @@ export class RunpodController {
           startedAt: now.toISOString(),
           hardDeadline: new Date(hardDeadline).toISOString(),
           admissionCutoffAt: admissionCutoff(hardDeadline),
+          costLedger: {
+            ...emptyRunpodCostLedger(),
+            accruedAt: now.toISOString(),
+          },
           message: pod
             ? "Existing managed RunPod Pod was reconciled."
             : "RunPod Pod creation is planned.",
@@ -671,7 +784,9 @@ export class RunpodController {
           pod = await this.gateway.startPod(pod.id);
         }
         const finalPod = pod;
+        const verifiedAt = this.now();
         await this.store.mutate((state) => {
+          accrueCostLedger(state.session, verifiedAt);
           const current = state.operations.find(
             (item) => item.id === input.operationId,
           );
@@ -683,7 +798,7 @@ export class RunpodController {
           state.session.podId = finalPod.id;
           state.session.podName = finalPod.name;
           state.session.phase = infrastructurePhase(finalPod);
-          state.session.lastVerifiedAt = this.now().toISOString();
+          state.session.lastVerifiedAt = verifiedAt.toISOString();
           state.session.message =
             finalPod.status === "RUNNING"
               ? "RunPod is running; worker readiness is still being checked."
@@ -722,24 +837,31 @@ export class RunpodController {
     const pod = await this.findSessionPod(initial);
     if (!pod) {
       if (initial.session.phase === "planned") return initial;
+      const verifiedAt = this.now();
       await this.store.mutate((state) => {
-        state.session = emptyRunpodControlSession();
-        state.session.lastVerifiedAt = this.now().toISOString();
+        accrueCostLedger(state.session, verifiedAt);
+        state.session.phase = "off";
+        state.session.podId = null;
+        state.session.workerReady = false;
+        state.session.lastVerifiedAt = verifiedAt.toISOString();
+        state.session.message =
+          "No managed RunPod Pod exists; the last cost estimate was preserved.";
       });
       return await this.store.read();
     }
     let workerReady = false;
     if (pod.status === "RUNNING" && initial.session.phase !== "stopping")
       workerReady = await this.workerProbe(pod.id);
-    const verifiedAt = this.now().toISOString();
+    const verifiedAt = this.now();
     await this.store.mutate((state) => {
+      accrueCostLedger(state.session, verifiedAt);
       state.session.podId = pod.id;
       state.session.podName = pod.name;
-      state.session.lastVerifiedAt = verifiedAt;
+      state.session.lastVerifiedAt = verifiedAt.toISOString();
       state.session.workerReady = workerReady;
       if (isStopped(pod)) {
         state.session.phase = "stopped";
-        state.session.stopConfirmedAt = this.now().toISOString();
+        state.session.stopConfirmedAt = verifiedAt.toISOString();
         state.session.nextRetryAt = null;
         state.session.message = `RunPod stop was verified as ${pod.status}.`;
         for (const operation of state.operations) {
@@ -748,13 +870,13 @@ export class RunpodController {
             ["stop", "watchdog-stop"].includes(operation.kind)
           ) {
             operation.status = "succeeded";
-            operation.updatedAt = this.now().toISOString();
+            operation.updatedAt = verifiedAt.toISOString();
             operation.error = null;
           }
         }
       } else if (pod.status === "RUNNING") {
         if (workerReady && !state.session.readyAt)
-          state.session.readyAt = verifiedAt;
+          state.session.readyAt = verifiedAt.toISOString();
         state.session.phase =
           state.session.phase === "stopping"
             ? "stopping"
@@ -783,13 +905,15 @@ export class RunpodController {
     scheduleRetry: boolean,
   ) {
     const message = operationError(error);
+    const failedAt = this.now();
     await this.store.mutate((state) => {
+      accrueCostLedger(state.session, failedAt);
       const operation = state.operations.find(
         (item) => item.id === operationId,
       );
       if (operation) {
         operation.status = "failed";
-        operation.updatedAt = this.now().toISOString();
+        operation.updatedAt = failedAt.toISOString();
         operation.error = message;
       }
       state.session.phase = "error";
@@ -801,7 +925,7 @@ export class RunpodController {
           retry >= MAX_STOP_FAILURES
             ? null
             : new Date(
-                this.now().getTime() + 30_000 * 2 ** (retry - 1),
+                failedAt.getTime() + 30_000 * 2 ** (retry - 1),
               ).toISOString();
       }
     });
@@ -852,7 +976,9 @@ export class RunpodController {
         const state = await this.store.read();
         const pod = await this.findSessionPod(state);
         if (!pod || isStopped(pod)) {
+          const confirmedAt = this.now();
           await this.store.mutate((current) => {
+            accrueCostLedger(current.session, confirmedAt);
             const operation = current.operations.find(
               (item) => item.id === input.operationId,
             );
@@ -861,9 +987,9 @@ export class RunpodController {
               operation.updatedAt = this.now().toISOString();
             }
             current.session.phase = pod ? "stopped" : "off";
-            current.session.stopConfirmedAt = this.now().toISOString();
+            current.session.stopConfirmedAt = confirmedAt.toISOString();
             current.session.stopReason = reason;
-            current.session.lastVerifiedAt = this.now().toISOString();
+            current.session.lastVerifiedAt = confirmedAt.toISOString();
             current.session.nextRetryAt = null;
             current.session.message = pod
               ? `RunPod stop was verified as ${pod.status}.`
@@ -881,15 +1007,19 @@ export class RunpodController {
             409,
             "RunPod does not currently allow the Pod to be stopped.",
           );
+        const requestedAt = this.now();
         await this.store.mutate((current) => {
+          accrueCostLedger(current.session, requestedAt);
           current.session.phase = "stopping";
-          current.session.stopRequestedAt = this.now().toISOString();
+          current.session.stopRequestedAt = requestedAt.toISOString();
           current.session.stopReason = reason;
           current.session.message = "RunPod stop was requested.";
         });
         await this.markMutationAttempted(input.operationId);
         const stoppedPod = await this.gateway.stopPod(pod.id);
+        const verifiedAt = this.now();
         await this.store.mutate((current) => {
+          accrueCostLedger(current.session, verifiedAt);
           const confirmed = isStopped(stoppedPod);
           const operation = current.operations.find(
             (item) => item.id === input.operationId,
@@ -899,9 +1029,9 @@ export class RunpodController {
             operation.updatedAt = this.now().toISOString();
           }
           current.session.phase = confirmed ? "stopped" : "stopping";
-          current.session.lastVerifiedAt = this.now().toISOString();
+          current.session.lastVerifiedAt = verifiedAt.toISOString();
           current.session.stopConfirmedAt = confirmed
-            ? this.now().toISOString()
+            ? verifiedAt.toISOString()
             : null;
           if (confirmed) {
             current.session.retryCount = 0;
@@ -913,7 +1043,7 @@ export class RunpodController {
               retry >= MAX_STOP_FAILURES
                 ? null
                 : new Date(
-                    this.now().getTime() + 30_000 * 2 ** (retry - 1),
+                    verifiedAt.getTime() + 30_000 * 2 ** (retry - 1),
                   ).toISOString();
           }
           current.session.message = confirmed
@@ -966,6 +1096,7 @@ export class RunpodController {
     }
     const completedAt = this.now().toISOString();
     await this.store.mutate((state) => {
+      accrueCostLedger(state.session, new Date(completedAt));
       state.session.drainCompletedAt = completedAt;
       state.session.cancelledJobCount = summary.requestedJobCount;
       state.session.cancellationFailureCount = summary.failedJobCount;

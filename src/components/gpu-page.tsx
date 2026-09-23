@@ -63,6 +63,10 @@ async function responseMessage(response: Response, fallback: string) {
   return payload?.message || fallback;
 }
 
+function formatEstimatedUsd(value: number): string {
+  return `$${value.toFixed(4)}`;
+}
+
 export function GpuPage() {
   const { state, service } = useStudio();
   const { session, settings } = state;
@@ -435,6 +439,95 @@ export function GpuPage() {
                             : "Volume / lokasi belum diisi"}
                       </small>
                     </div>
+                  </div>
+                  <div className="runpod-cost-ledger">
+                    <div className="runpod-cost-heading">
+                      <strong>Ledger estimasi biaya</strong>
+                      <small>
+                        Berdasarkan timestamp control plane · bukan tagihan
+                        RunPod
+                      </small>
+                    </div>
+                    <div className="runpod-cost-grid">
+                      <div>
+                        <span>Compute terakumulasi</span>
+                        <strong>
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate.accruedComputeCostUsd,
+                          )}
+                        </strong>
+                        <small>
+                          {formatTime(runpodControl.costEstimate.totalSeconds)}{" "}
+                          ·{" "}
+                          {runpodControl.costEstimate.hourlyRate === null
+                            ? "tarif belum ada"
+                            : `$${runpodControl.costEstimate.hourlyRate.toFixed(2)}/jam`}
+                        </small>
+                      </div>
+                      <div>
+                        <span>Startup / loading</span>
+                        <strong>
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate.startup.estimatedCostUsd,
+                          )}
+                        </strong>
+                        <small>
+                          {formatTime(
+                            runpodControl.costEstimate.startup.seconds,
+                          )}
+                        </small>
+                      </div>
+                      <div>
+                        <span>Job aktif / idle</span>
+                        <strong>
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate.active.estimatedCostUsd,
+                          )}{" "}
+                          /{" "}
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate.idle.estimatedCostUsd,
+                          )}
+                        </strong>
+                        <small>
+                          Shutdown/error{" "}
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate.shutdown
+                              .estimatedCostUsd,
+                          )}
+                        </small>
+                      </div>
+                      <div>
+                        <span>Exposure sampai hard deadline</span>
+                        <strong>
+                          +
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate
+                              .remainingComputeExposureUsd,
+                          )}
+                        </strong>
+                        <small>
+                          Proyeksi compute{" "}
+                          {formatEstimatedUsd(
+                            runpodControl.costEstimate.projectedComputeCostUsd,
+                          )}
+                        </small>
+                      </div>
+                    </div>
+                    <p>
+                      {runpodControl.storage.volumeConfigured
+                        ? "Storage Network Volume "
+                        : "Rencana storage Network Volume "}
+                      <strong>
+                        $
+                        {runpodControl.costEstimate.storageMonthlyCostUsd.toFixed(
+                          2,
+                        )}
+                        /bulan
+                      </strong>
+                      {runpodControl.storage.volumeConfigured
+                        ? " dihitung terpisah dan tetap berjalan ketika compute berhenti."
+                        : " belum dikenakan karena volume belum dibuat."}
+                    </p>
                   </div>
                 </div>
               )}

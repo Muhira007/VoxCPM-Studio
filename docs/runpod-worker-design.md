@@ -28,6 +28,7 @@ Kerangka operasi tulis sudah diimplementasikan dan diuji tanpa akun berbayar:
 - Watchdog membaca state job aplikasi. Job `running` atau `queued` menghapus idle deadline; antrean kosong menetapkan deadline dari aktivitas terakhir. Hard deadline dievaluasi lebih dahulu dan tidak bergantung pada snapshot workload.
 - Admission job ditutup lima menit sebelum hard deadline. Watchdog menandai drain, meminta cancel untuk job aktif satu kali, menyimpan jumlah permintaan yang gagal, dan tetap menjalankan hard stop pada tenggat.
 - Perpanjangan 30 menit memakai operation ID, lease, dan transaksi state yang sama untuk memperbarui hard deadline. Operasi ditolak jika sesi tidak `ready`, deadline telah lewat, durasi maksimum terlampaui, atau estimasi compute melebihi hard cost limit.
+- Ledger biaya persisten mengakumulasi waktu startup/loading, job aktif, idle, serta shutdown/error pada setiap transisi controller dan pembaruan workload. Status menghitung biaya per kategori, biaya compute terakumulasi, dan exposure hingga hard deadline dari tarif sesi.
 - `GET/POST /api/v1/runpod/control` dilindungi autentikasi studio dan same-origin guard. Web UI hanya menampilkan status kunci dan belum menyediakan tombol mutation.
 
 Seluruh jalur di atas telah diuji dengan fake RunPod. Key aktual masih baca saja, `RUNPOD_WRITE_ENABLED=false`, data center dan volume ID belum diisi, serta akun tetap memiliki nol Pod. Watchdog sudah tersedia sebagai `npm run runpod:watchdog`, memakai file lock lintas proses dan template timer satu menit. Pengawas belum dideploy pada layanan cloud yang selalu aktif, jadi pengujian lokal belum memenuhi jaminan shutdown ketika PC mati. Rincian operasional ada di [runbook watchdog](runpod-watchdog.md).
@@ -40,7 +41,7 @@ Referensi: [Network Volumes](https://docs.runpod.io/storage/network-volumes), [j
 
 ## Kepemilikan state
 
-Next.js bertindak sebagai control plane. Storage persisten menyimpan `podId`, status yang terakhir diverifikasi, batas harga, waktu mulai, `hardDeadline`, `idleDeadline`, pekerjaan, lokasi referensi/hasil, jumlah retry, serta versi state. GPU worker hanya menjalankan pekerjaan dan tidak menjadi sumber kebenaran untuk tagihan atau umur Pod.
+Next.js bertindak sebagai control plane. Storage persisten menyimpan `podId`, status yang terakhir diverifikasi, batas harga, waktu mulai, `hardDeadline`, `idleDeadline`, bucket waktu biaya, pekerjaan, lokasi referensi/hasil, jumlah retry, serta versi state. GPU worker hanya menjalankan pekerjaan dan tidak menjadi sumber kebenaran untuk tagihan atau umur Pod.
 
 Pengawas shutdown harus berjalan pada layanan cloud yang tetap hidup ketika browser ditutup dan PC pengguna mati. Ia tidak boleh bergantung pada timer React, proses Next.js lokal, atau Pod GPU yang hendak dihentikan. Model awal memakai satu replica aplikasi dan scheduler pada persistent filesystem yang sama; multi-replica memerlukan datastore transaksional bersama.
 
@@ -104,4 +105,5 @@ Worker saat ini menolak startup jika direktori data/model/cache/referensi/output
 - Log menyertakan operation ID, session ID, job ID, transisi status, latency, dan hasil stop tanpa mencatat kunci, teks sensitif, atau isi audio.
 - Endpoint pengelolaan sesi memerlukan autentikasi pengguna; CORS tidak dipakai sebagai autentikasi.
 - Batasi ukuran body, jenis audio, timeout jaringan, jumlah retry, dan satu pekerjaan aktif untuk MVP.
-- Rekam waktu provisioning, model load, running, idle, stop request, stop confirmed, serta storage terpakai agar estimasi biaya dapat dibandingkan dengan tagihan.
+- Ledger saat ini merekam startup/loading, job aktif, idle, dan shutdown/error berdasarkan timestamp control plane. Bandingkan hasilnya dengan timestamp serta tagihan RunPod karena status polling dan keterlambatan jaringan dapat menghasilkan selisih.
+- Rekam storage terpakai aktual setelah Network Volume dibuat agar estimasi bulanan dapat dibandingkan dengan tagihan.

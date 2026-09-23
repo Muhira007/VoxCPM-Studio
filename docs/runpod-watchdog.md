@@ -12,7 +12,7 @@ Dengan konfigurasi repository saat ini, hasilnya adalah JSON seperti berikut dan
 { "ok": true, "action": "skipped_writes_disabled", "phase": "off" }
 ```
 
-Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan yang jatuh tempo. Exit code nonzero harus memicu alert operator. Output memuat hard/idle deadline, jumlah job running/queued, retry, dan alasan stop tanpa API key, worker key, teks pengguna, atau audio.
+Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan yang jatuh tempo. Exit code nonzero harus memicu alert operator. Output memuat hard/idle deadline, jumlah job running/queued, retry, alasan stop, dan `costEstimate` tanpa API key, worker key, teks pengguna, atau audio. `costEstimate` adalah perhitungan dari timestamp control plane, bukan tagihan RunPod.
 
 ## Urutan keputusan deadline
 
@@ -25,6 +25,12 @@ Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan ya
 Lima menit sebelum hard deadline, controller memasuki drain: endpoint pembuatan job menolak pekerjaan baru, job `running`/`queued` diminta batal, dan hasil cancel disimpan sebagai jumlah yang ditandai batal serta jumlah request worker yang gagal. Drain idempoten sehingga eksekusi watchdog berikutnya tidak mengirim cancel kedua. Perpanjangan ditolak setelah drain dimulai. Saat hard deadline tercapai, kegagalan cancel tidak boleh menahan stop Pod.
 
 Perilaku ini telah diuji dengan fake worker dan fake RunPod. Durasi cutoff lima menit adalah batas konservatif sebelum waktu inferensi aktual diukur pada GPU; nilainya harus dievaluasi ulang dari data Fase 6.
+
+## Ledger estimasi biaya
+
+State sesi menyimpan waktu terakumulasi untuk empat kategori: startup/loading, job aktif, idle, serta shutdown/error. Controller mengakumulasi kategori lama sebelum mengubah phase atau snapshot workload, sehingga perpindahan state tidak memasukkan interval ke bucket yang baru. Endpoint submit, polling, dan cancel job juga meminta sinkronisasi workload secara best-effort agar job yang lebih singkat dari cadence watchdog tetap tercatat tanpa membuat alur job gagal ketika observabilitas bermasalah.
+
+Status kontrol dan output watchdog mengalikan detik pada setiap kategori dengan tarif per jam sesi. Output juga menghitung sisa exposure compute sampai hard deadline dan proyeksi compute maksimum. Estimasi Standard Network Volume 30 GB sebesar `$2.10/bulan` selalu dilaporkan terpisah; angka itu belum menjadi biaya aktual selama volume belum dibuat. Semua angka harus dibandingkan dengan invoice serta timestamp RunPod setelah siklus GPU pertama.
 
 ## Model deployment yang dipilih
 
@@ -59,6 +65,7 @@ Perintah instalasi di atas belum dijalankan. Timer baru boleh diaktifkan setelah
 - Network Volume dan data center sudah cocok dengan GPU yang dipilih.
 - Scheduler berjalan setiap menit dan exit code nonzero menghasilkan alert.
 - Endpoint job menolak pekerjaan baru selama drain dan UI menampilkan countdown serta alasan stop.
+- UI dan output watchdog menandai ledger biaya sebagai estimasi serta memisahkan compute dari storage bulanan.
 - Uji terkontrol membuktikan proses berhenti ketika browser serta PC pengguna mati.
 
 Deployment cloud dan verifikasi terakhir tetap menunggu saldo serta host yang dipilih.

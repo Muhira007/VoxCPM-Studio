@@ -618,6 +618,117 @@ test("idle watchdog waits for running and queued jobs before stopping", async ()
   }
 });
 
+test("cost ledger separates startup, active, idle, shutdown, and exposure", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    let workload: RunpodWorkloadSnapshot = {
+      runningJobCount: 0,
+      queuedJobCount: 0,
+      lastActivityAt: null,
+      idleMinutes: 10,
+    };
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview(0.5) },
+      config,
+      now: () => clock,
+      workerProbe: async () => true,
+      workload: {
+        snapshot: async () => structuredClone(workload),
+        cancelActive: async () => ({
+          requestedJobCount: workload.runningJobCount + workload.queuedJobCount,
+          failedJobCount: 0,
+        }),
+      },
+    });
+    await controller.start({
+      operationId: "operation_cost_ledger_start",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+
+    clock = new Date("2026-09-21T01:02:00.000Z");
+    gateway.pods[0].status = "RUNNING";
+    await controller.reconcile();
+    workload = {
+      runningJobCount: 1,
+      queuedJobCount: 0,
+      lastActivityAt: "2026-09-21T01:03:00.000Z",
+      idleMinutes: 10,
+    };
+    clock = new Date("2026-09-21T01:03:00.000Z");
+    await controller.syncWorkload();
+    workload = {
+      runningJobCount: 0,
+      queuedJobCount: 0,
+      lastActivityAt: "2026-09-21T01:05:00.000Z",
+      idleMinutes: 10,
+    };
+    clock = new Date("2026-09-21T01:05:00.000Z");
+    await controller.syncWorkload();
+
+    clock = new Date("2026-09-21T01:06:00.000Z");
+    const runningEstimate = (await controller.status()).costEstimate;
+    assert.equal(runningEstimate.startup.seconds, 120);
+    assert.equal(runningEstimate.active.seconds, 120);
+    assert.equal(runningEstimate.idle.seconds, 120);
+    assert.equal(runningEstimate.shutdown.seconds, 0);
+    assert.equal(runningEstimate.totalSeconds, 360);
+    assert.equal(runningEstimate.accruedComputeCostUsd, 0.05);
+    assert.equal(runningEstimate.remainingComputeExposureUsd, 0.2);
+    assert.equal(runningEstimate.projectedComputeCostUsd, 0.25);
+    assert.equal(runningEstimate.storageMonthlyCostUsd, 2.1);
+
+    gateway.stopResultStatus = "RUNNING";
+    await controller.stop({ operationId: "operation_cost_ledger_stop" });
+    clock = new Date("2026-09-21T01:07:00.000Z");
+    await controller.syncWorkload();
+    const stoppingEstimate = (await controller.status()).costEstimate;
+    assert.equal(stoppingEstimate.shutdown.seconds, 60);
+    assert.equal(stoppingEstimate.totalSeconds, 420);
+    assert.equal(stoppingEstimate.accruedComputeCostUsd, 0.058333);
+    assert.equal(stoppingEstimate.remainingComputeExposureUsd, 0.191667);
+    assert.equal(stoppingEstimate.projectedComputeCostUsd, 0.25);
+    assert.equal((await store.read()).session.costLedger.shutdownSeconds, 60);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
+test("cost ledger does not accrue compute before a Pod exists", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    await store.mutate((state) => {
+      state.session.phase = "planned";
+      state.session.startedAt = "2026-09-21T01:00:00.000Z";
+      state.session.hardDeadline = "2026-09-21T01:30:00.000Z";
+      state.session.hourlyRate = 0.5;
+      state.session.costLedger.accruedAt = state.session.startedAt;
+    });
+    const controller = new RunpodController({
+      store,
+      gateway: new FakeGateway(),
+      catalog: { overview: async () => overview(0.5) },
+      config,
+      now: () => new Date("2026-09-21T01:05:00.000Z"),
+      workerProbe: async () => false,
+      workload: idleWorkload(),
+    });
+
+    const estimate = (await controller.status()).costEstimate;
+    assert.equal(estimate.startup.seconds, 0);
+    assert.equal(estimate.totalSeconds, 0);
+    assert.equal(estimate.accruedComputeCostUsd, 0);
+    assert.equal(estimate.remainingComputeExposureUsd, 0.208333);
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
 test("admission cutoff drains active jobs once before the hard deadline", async () => {
   const { directory, store } = await temporaryStore();
   try {

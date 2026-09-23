@@ -132,6 +132,7 @@ export async function POST(request: Request) {
         job: publicJob(selection.job),
         created: false,
       });
+    await runpodController.observeWorkloadBestEffort();
     try {
       const workerReferencePath =
         selection.referencePath && selection.referenceId
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
         message: worker.message || selection.job.message,
         updatedAt: new Date().toISOString(),
       });
+      await runpodController.observeWorkloadBestEffort();
       return NextResponse.json(
         { job: publicJob(updated!), created: true },
         { status: 202 },
@@ -168,6 +170,7 @@ export async function POST(request: Request) {
           error instanceof Error ? error.message : "Worker submission failed.",
         updatedAt: new Date().toISOString(),
       });
+      await runpodController.observeWorkloadBestEffort();
       throw error;
     }
   } catch (error) {

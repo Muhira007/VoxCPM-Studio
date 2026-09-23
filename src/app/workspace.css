@@ -692,6 +692,56 @@ textarea::placeholder {
   margin: 5px 0 3px;
   font-size: 12px;
 }
+.runpod-cost-ledger {
+  padding: 14px 18px 16px;
+  border-top: 1px solid #eee3ce;
+  background: #fffdf8;
+}
+.runpod-cost-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.runpod-cost-heading strong {
+  font-size: 12px;
+}
+.runpod-cost-heading small,
+.runpod-cost-grid span,
+.runpod-cost-grid small,
+.runpod-cost-ledger p {
+  color: #81745f;
+  font-size: 11px;
+}
+.runpod-cost-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.runpod-cost-grid > div {
+  padding: 10px 12px;
+  border: 1px solid #eee3ce;
+  border-radius: 7px;
+  background: #fffaf0;
+}
+.runpod-cost-grid span,
+.runpod-cost-grid strong,
+.runpod-cost-grid small {
+  display: block;
+}
+.runpod-cost-grid strong {
+  margin: 5px 0 3px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.runpod-cost-ledger p {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.runpod-cost-ledger p strong {
+  color: #594c3a;
+}
 .runpod-plan-controls {
   display: flex;
   align-items: center;
@@ -1180,6 +1230,14 @@ textarea::placeholder {
   }
   .runpod-guard-grid {
     gap: 12px;
+  }
+  .runpod-cost-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .runpod-cost-grid {
+    grid-template-columns: 1fr;
   }
   .runpod-guard-grid > div,
   .runpod-guard-grid > div:first-child,

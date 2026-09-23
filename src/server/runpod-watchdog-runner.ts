@@ -29,6 +29,7 @@ export interface RunpodWatchdogSummary {
   nextRetryAt: string | null;
   stopConfirmedAt: string | null;
   stopReason: RunpodControlState["session"]["stopReason"];
+  costEstimate: RunpodControlStatus["costEstimate"];
 }
 
 interface WatchdogController {
@@ -58,24 +59,26 @@ export async function runRunpodWatchdogOnce(
 ): Promise<RunpodWatchdogSummary> {
   const before = await controller.status();
   const after = await controller.runWatchdog();
+  const current = await controller.status();
   return {
     ok: true,
     ranAt: now().toISOString(),
     action: watchdogAction(before, after),
-    phase: after.session.phase,
-    podId: after.session.podId,
-    hardDeadline: after.session.hardDeadline,
-    admissionCutoffAt: after.session.admissionCutoffAt,
-    idleDeadline: after.session.idleDeadline,
-    runningJobCount: after.session.runningJobCount,
-    queuedJobCount: after.session.queuedJobCount,
-    drainStartedAt: after.session.drainStartedAt,
-    drainCompletedAt: after.session.drainCompletedAt,
-    cancelledJobCount: after.session.cancelledJobCount,
-    cancellationFailureCount: after.session.cancellationFailureCount,
-    retryCount: after.session.retryCount,
-    nextRetryAt: after.session.nextRetryAt,
-    stopConfirmedAt: after.session.stopConfirmedAt,
-    stopReason: after.session.stopReason,
+    phase: current.session.phase,
+    podId: current.session.podId,
+    hardDeadline: current.session.hardDeadline,
+    admissionCutoffAt: current.session.admissionCutoffAt,
+    idleDeadline: current.session.idleDeadline,
+    runningJobCount: current.session.runningJobCount,
+    queuedJobCount: current.session.queuedJobCount,
+    drainStartedAt: current.session.drainStartedAt,
+    drainCompletedAt: current.session.drainCompletedAt,
+    cancelledJobCount: current.session.cancelledJobCount,
+    cancellationFailureCount: current.session.cancellationFailureCount,
+    retryCount: current.session.retryCount,
+    nextRetryAt: current.session.nextRetryAt,
+    stopConfirmedAt: current.session.stopConfirmedAt,
+    stopReason: current.session.stopReason,
+    costEstimate: current.costEstimate,
   };
 }
