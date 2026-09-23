@@ -1,6 +1,6 @@
 # VoxCPM Studio
 
-Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, worker simulasi, container simulasi, integrasi RunPod REST API v2 baca saja, serta state machine kontrol cloud yang terkunci telah diverifikasi. Paket worker VoxCPM2/CUDA sudah disiapkan, tetapi belum dijalankan pada GPU dan belum menghasilkan audio AI yang terverifikasi.**
+Web UI pribadi berbahasa Indonesia untuk merancang alur TTS, Voice Design, dan voice cloning. **Frontend demo, API lokal, autentikasi sesi `HttpOnly`, adapter Web UI, pipeline ekspresi per segmen, worker simulasi, container simulasi, integrasi RunPod REST API v2 baca saja, serta state machine kontrol cloud yang terkunci telah diverifikasi. Paket worker VoxCPM2/CUDA sudah disiapkan, tetapi belum dijalankan pada GPU dan belum menghasilkan audio AI yang terverifikasi.**
 
 ## Menjalankan aplikasi
 
@@ -37,7 +37,7 @@ Preflight operasi berbayar tersedia melalui `npm run runpod:preflight`. Command 
 
 | Halaman       | Perilaku saat ini                                                                                                                                                                                |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Studio        | Editor 5.000 karakter, empat mode, gaya bicara, serta kompiler dan preview 11 tag ekspresi `bebas-v1` untuk naskah dari BEBAS.                                                                  |
+| Studio        | Editor 5.000 karakter, empat mode, gaya bicara, serta kompiler 11 tag ekspresi `bebas-v1`; pekerjaan ekspresif diproses berurutan dengan status dan retry per segmen.                            |
 | Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman.                                                                            |
 | Riwayat       | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah.                                                                                                     |
 | Sesi GPU      | Simulasi provisioning tetap lokal. Panel API menampilkan inventaris, dry-run, storage, batas biaya, idle timeout, jumlah job aktif/antri, ledger estimasi biaya, dan status kunci operasi cloud. |
@@ -65,7 +65,7 @@ Urutan mencoba:
 - `NEXT_PUBLIC_STUDIO_SERVICE=demo` memakai state browser. Nilai `api` menampilkan login dan memakai adapter API; hanya pilihan mode ini yang publik, sedangkan seluruh kunci dan secret tetap berada di server.
 - Metadata backend tersimpan atomik di `.data/studio-state.json`; referensi dan output mempunyai direktori terpisah. Folder `.data` diabaikan Git dan perlu dipetakan ke volume persisten saat deployment.
 - Mode API menyimpan draft di browser serta sesi, riwayat, pengaturan, dan referensi audio pada backend lokal. Logout menghapus cookie; reset backend memerlukan konfirmasi UI.
-- Belum ada inferensi model, audio keluaran, konversi MP3, atau siklus Pod sungguhan. Kompiler ekspresi sudah memvalidasi dan menampilkan segmen, tetapi sintesis serta penggabungan audio per segmen belum diaktifkan. State machine kontrol Pod sudah ada tetapi feature flag tetap nonaktif. Kemampuan dan kualitas suara VoxCPM2 masih harus diuji pada fase GPU.
+- Belum ada inferensi model yang dijalankan pada GPU, audio AI terverifikasi, konversi MP3, atau siklus Pod sungguhan. Jalur ekspresi sudah mengirim tiap segmen secara berurutan, menyimpan hasil parsial, menormalisasi WAV PCM 16-bit, menambahkan jeda, menggabungkan hasil secara atomik, dan mendukung retry satu segmen. Konsistensi identitas suara, mutu transisi, dan efektivitas ekspresi masih harus diuji lewat audio VoxCPM2 nyata.
 
 ## Pemeriksaan
 
@@ -77,9 +77,9 @@ npm test
 npm run build
 ```
 
-Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup parser dan whitelist ekspresi BEBAS, persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, blocker dry-run, feature lock sebelum jaringan, rekonsiliasi create/resume, deadline berbasis workload, perpanjangan atomik, backoff, dan verifikasi stop.
+Pengujian Node memakai `node:test`; pengujian worker memakai `pytest`. Tes unit tidak membutuhkan GPU atau koneksi RunPod. Selain frontend, pengujian mencakup parser dan whitelist ekspresi BEBAS, batas 50 segmen, status dan retry per segmen, normalisasi serta penggabungan WAV sintetis, pemakaian ulang referensi cloning, persistensi server dan inisialisasi paralel, pembatasan path, token dan origin sesi Web UI, adapter API, polling status, autentikasi worker, idempotensi, antrean tunggal, pembatalan, transfer referensi, pemetaan API VoxCPM2, penyimpanan WAV, kegagalan simulasi, bearer auth RunPod, pagination, sanitasi error, blocker dry-run, feature lock sebelum jaringan, rekonsiliasi create/resume, deadline berbasis workload, perpanjangan atomik, backoff, dan verifikasi stop.
 
-Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu. Container simulasi kembali lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
+Integrasi browser ↔ Next.js ↔ FastAPI telah diuji lokal: login/logout cookie, origin guard, sesi worker, naskah tiga ekspresi, status setiap segmen, retry satu segmen, polling sampai selesai, unggah/baca/edit WAV, reset backend, serta tidak adanya audio keluaran palsu pada mode simulasi. Fake runtime membentuk tiga WAV PCM dengan satu referensi cloning yang sama, lalu membuktikan hasil gabungan 0,45 detik dan regenerasi hanya pada segmen pilihan. Container simulasi sebelumnya lulus pada [run 35568741418](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741418). Image GPU berhasil dibangun tanpa perangkat GPU pada [run 35568741429](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35568741429), termasuk verifikasi package, UID non-root, pin revision model, dan kegagalan yang jelas ketika CUDA tidak tersedia.
 
 Image tervalidasi tersebut telah diterbitkan sebagai [paket GHCR publik](https://github.com/users/Muhira007/packages/container/package/voxcpm-studio-worker) melalui [run 35571278859](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35571278859). Gunakan referensi tetap `ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd`; jangan memakai tag `latest`. Tag commit dilindungi dari overwrite oleh workflow. Manifest tag dan digest telah diuji dengan pull anonim, tetapi image belum dijalankan pada GPU.
 

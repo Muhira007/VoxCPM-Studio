@@ -377,6 +377,51 @@ textarea::placeholder {
   display: flex;
   gap: 3px;
 }
+.job-segments {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  list-style: none;
+}
+.job-segments > li {
+  padding: 11px 12px;
+  border: 1px solid #e7e9ed;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.job-segments > li.failed {
+  border-color: #efd0ca;
+  background: #fff7f5;
+}
+.job-segments > li > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.job-segment-tags {
+  color: #a44f30;
+  font-size: 11px;
+  font-weight: 600;
+}
+.job-segments .job-badge {
+  margin-left: auto;
+}
+.job-segments p {
+  margin-top: 7px;
+  color: #414853;
+  font-size: 12px;
+}
+.job-segments small {
+  display: block;
+  margin-top: 4px;
+  color: #7c838f;
+  font-size: 11px;
+}
+.job-segments .text-button {
+  margin-top: 8px;
+  font-size: 11px;
+}
 .progress-track {
   height: 5px;
   border-radius: 8px;

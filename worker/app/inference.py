@@ -87,9 +87,12 @@ def generation_arguments(request: SynthesisRequest) -> dict[str, Any]:
     text = request.text
     arguments: dict[str, Any] = {}
     if request.mode == "design":
-        text = f"({request.description}){text}"
+        instruction = ", ".join(filter(None, [request.description, request.control_instruction]))
+        text = f"({instruction}){text}"
     elif request.mode == "clone":
-        instruction = STYLE_INSTRUCTIONS.get(request.style)
+        instruction = ", ".join(
+            filter(None, [STYLE_INSTRUCTIONS.get(request.style), request.control_instruction])
+        )
         if instruction:
             text = f"({instruction}){text}"
         arguments["reference_wav_path"] = request.reference_path
@@ -99,6 +102,8 @@ def generation_arguments(request: SynthesisRequest) -> dict[str, Any]:
             prompt_text=request.transcript,
             reference_wav_path=request.reference_path,
         )
+    elif request.control_instruction:
+        text = f"({request.control_instruction}){text}"
     arguments["text"] = text
     return arguments
 

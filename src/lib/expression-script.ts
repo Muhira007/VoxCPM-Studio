@@ -1,4 +1,5 @@
 export const EXPRESSION_DIALECT = "bebas-v1" as const;
+export const MAX_EXPRESSION_SEGMENTS = 50;
 
 export type ExpressionTag =
   | "whispers"
@@ -28,10 +29,16 @@ export interface ExpressionSegment {
   text: string;
   controlInstruction: string | null;
   targetText: string;
+  pauseAfterMs: number;
 }
 
 export interface ExpressionIssue {
-  code: "unknown-tag" | "malformed-tag" | "dangling-tag" | "duplicate-tag";
+  code:
+    | "unknown-tag"
+    | "malformed-tag"
+    | "dangling-tag"
+    | "duplicate-tag"
+    | "too-many-segments";
   severity: "error" | "warning";
   position: number;
   token: string;
@@ -184,6 +191,7 @@ export function compileExpressionScript(
       text,
       controlInstruction: instructions.length ? instructions.join(" ") : null,
       targetText: [...nativeTokens, text].join(" "),
+      pauseAfterMs: 0,
     });
     pendingTags = [];
   }
@@ -247,6 +255,25 @@ export function compileExpressionScript(
   }
 
   const plainText = segments.map((segment) => segment.text).join(" ").trim();
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const text = segments[index].text;
+    segments[index].pauseAfterMs = /[!?][\"'”’)]?$/.test(text)
+      ? 280
+      : /[.][\"'”’)]?$/.test(text)
+        ? 220
+        : /[,;:][\"'”’)]?$/.test(text)
+          ? 140
+          : 180;
+  }
+  if (segments.length > MAX_EXPRESSION_SEGMENTS) {
+    issues.push({
+      code: "too-many-segments",
+      severity: "error",
+      position: script.length,
+      token: String(segments.length),
+      message: `Naskah ekspresif dibatasi ${MAX_EXPRESSION_SEGMENTS} segmen per pekerjaan.`,
+    });
+  }
   const hasBracketTokens = matchedRanges.length > 0 || issues.some(
     (issue) => issue.code === "malformed-tag",
   );

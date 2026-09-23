@@ -39,6 +39,10 @@ Model tidak dimasukkan ke image. Snapshot yang dipin diunduh ke `/workspace/mode
 - `clone`: referensi terisolasi dikirim sebagai `reference_wav_path`; preset gaya diterjemahkan menjadi instruksi teks.
 - `hifi`: referensi yang sama dipakai sebagai `prompt_wav_path` dan `reference_wav_path`, disertai transkrip persis sebagai `prompt_text`.
 
+Naskah dengan dialek ekspresi `bebas-v1` dikompilasi oleh backend menjadi maksimal 50 segmen. Setiap segmen membawa teks target, Control Instruction, urutan, dan jeda sesudahnya; tag mentah aplikasi tidak dikirim sebagai satu naskah ke model. Worker menjalankan segmen secara berurutan. Pada cloning, seluruh segmen memakai path referensi yang sama. Hi-Fi menolak naskah ekspresif karena API mode tersebut mengabaikan kontrol gaya.
+
+Setelah tiap segmen selesai, worker menyimpan WAV parsial dan statusnya. Seluruh WAV harus berupa PCM 16-bit dengan channel, sample rate, dan sample width yang sama. Worker menormalisasi puncak tiap segmen dengan gain maksimum 3×, menyisipkan jeda deterministik, lalu mengganti hasil gabungan secara atomik. Endpoint `POST /v1/jobs/{id}/segments/{index}/retry` membuat ulang segmen pilihan dan menggabungkan kembali bagian yang sudah ada; pembatalan serta kegagalan mempertahankan metadata hasil parsial untuk diagnosis dan retry.
+
 Backend aplikasi mengunggah referensi ke `PUT /v1/references/{id}` sebelum membuat pekerjaan. Worker menyimpan WAV hasil secara atomik dan menyediakannya melalui `GET /v1/jobs/{id}/audio`. Backend kemudian mengunduh hasil maksimal 100 MB ke storage aplikasi dan Web UI memakai `/api/v1/jobs/{id}/audio`. Kunci worker tetap berada di server.
 
 ## Build tanpa membuat Pod
@@ -82,4 +86,4 @@ Gunakan Network Volume bila hasil harus bertahan setelah Pod dihapus. Volume dis
 
 ## Validasi yang masih membutuhkan saldo
 
-Satu pengujian GPU terkontrol harus membuktikan: CUDA terlihat, snapshot yang dipin selesai dimuat, readiness menjadi `ready`, TTS Indonesia pendek menghasilkan WAV 48 kHz, cloning membaca referensi hasil unggahan, output dapat diunduh backend, cache dipakai ulang setelah restart, dan Pod berhenti dengan status RunPod yang sudah diverifikasi. Catat cold start, waktu sintesis, VRAM puncak, ukuran storage, dan biaya aktual.
+Satu pengujian GPU terkontrol harus membuktikan: CUDA terlihat, snapshot yang dipin selesai dimuat, readiness menjadi `ready`, TTS Indonesia pendek menghasilkan WAV 48 kHz, cloning membaca referensi hasil unggahan, naskah ekspresif mempertahankan identitas suara dan transisi yang layak, retry mengganti satu segmen, output dapat diunduh backend, cache dipakai ulang setelah restart, dan Pod berhenti dengan status RunPod yang sudah diverifikasi. Catat cold start, waktu sintesis per segmen, VRAM puncak, ukuran storage, dan biaya aktual.

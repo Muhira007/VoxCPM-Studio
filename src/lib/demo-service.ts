@@ -50,8 +50,6 @@ export function validateRequest(
   if (expressionError) return expressionError.message;
   if (expression.hasExpressionTags && request.mode === "hifi")
     return "Hi-Fi mengabaikan instruksi ekspresi. Gunakan Voice Cloning agar ekspresi dapat diarahkan.";
-  if (expression.hasExpressionTags)
-    return "Naskah ekspresif sudah valid, tetapi sintesis per segmen belum diaktifkan.";
   if (request.mode === "design" && !request.description.trim())
     return "Isi deskripsi karakter suara yang ingin dibuat.";
   if (request.mode === "clone" || request.mode === "hifi") {
@@ -215,6 +213,7 @@ export class DemoStudioService implements StudioService {
             .slice(0, 100)
             .map((job) => ({
               ...job,
+              segments: Array.isArray(job.segments) ? job.segments : [],
               audioUrl: null,
               audioDuration: null,
               message: ["queued", "running"].includes(job.status)
@@ -431,6 +430,17 @@ export class DemoStudioService implements StudioService {
           ? "Suara bawaan (demo)"
           : (this.snapshot.voices.find((voice) => voice.id === request.voiceId)
               ?.name ?? "Referensi");
+    const compiled = compileExpressionScript(request.text);
+    const segments = compiled.hasExpressionTags
+      ? compiled.segments.map((segment) => ({
+          ...segment,
+          tags: [...segment.tags],
+          status: "queued" as const,
+          progress: 0,
+          message: "Menunggu simulasi segmen.",
+          audioDuration: null,
+        }))
+      : [];
     const job: SynthesisJob = {
       id,
       request,
@@ -440,13 +450,28 @@ export class DemoStudioService implements StudioService {
       progress: 0,
       audioUrl: null,
       audioDuration: null,
+      segments,
     };
     this.publish({ jobs: [job, ...this.snapshot.jobs].slice(0, 100) });
     this.changeSession({ lastActivityAt: this.runtime.now() });
     const scenario = this.snapshot.settings.scenario;
     this.jobTimers.push(
       this.runtime.schedule(
-        () => this.updateJob(id, { status: "running", progress: 25 }),
+        () =>
+          this.updateJob(id, {
+            status: "running",
+            progress: 25,
+            segments: segments.map((segment, index) =>
+              index === 0
+                ? {
+                    ...segment,
+                    status: "running",
+                    progress: 25,
+                    message: "Simulasi segmen sedang berjalan.",
+                  }
+                : segment,
+            ),
+          }),
         550,
       ),
     );
@@ -459,6 +484,16 @@ export class DemoStudioService implements StudioService {
         if (scenario === "failure" || scenario === "disconnected") {
           this.updateJob(id, {
             status: "failed",
+            segments: segments.map((segment, index) =>
+              index === 0
+                ? {
+                    ...segment,
+                    status: "failed",
+                    progress: 70,
+                    message: "Skenario demo: segmen gagal diproses.",
+                  }
+                : segment,
+            ),
             message:
               scenario === "failure"
                 ? "Skenario demo: sintesis gagal. Naskah tetap tersimpan dan dapat dicoba ulang."
@@ -476,6 +511,12 @@ export class DemoStudioService implements StudioService {
             status: "succeeded",
             progress: 100,
             message: "Alur demo selesai. Belum ada audio AI yang dihasilkan.",
+            segments: segments.map((segment) => ({
+              ...segment,
+              status: "succeeded",
+              progress: 100,
+              message: "Kontrak segmen berhasil disimulasikan tanpa audio.",
+            })),
           });
         this.changeSession({ lastActivityAt: this.runtime.now() });
       }, 2900),
@@ -489,8 +530,43 @@ export class DemoStudioService implements StudioService {
     this.updateJob(id, {
       status: "cancelled",
       message: "Pekerjaan demo dibatalkan. Naskah tetap tersimpan.",
+      segments: job.segments.map((segment) =>
+        ["queued", "running"].includes(segment.status)
+          ? {
+              ...segment,
+              status: "cancelled",
+              message: "Segmen dibatalkan bersama pekerjaannya.",
+            }
+          : segment,
+      ),
     });
     this.changeSession({ lastActivityAt: this.runtime.now() });
+  }
+  retrySegment(jobId: string, segmentIndex: number) {
+    const job = this.snapshot.jobs.find((item) => item.id === jobId);
+    const segment = job?.segments.find((item) => item.index === segmentIndex);
+    if (!job || !segment) throw new Error("Segmen tidak ditemukan.");
+    if (
+      this.snapshot.jobs.some((item) =>
+        ["queued", "running"].includes(item.status),
+      )
+    )
+      throw new Error("Tunggu pekerjaan aktif selesai sebelum mengulang segmen.");
+    this.updateJob(jobId, {
+      status: "succeeded",
+      progress: 100,
+      message: "Retry segmen berhasil disimulasikan tanpa audio.",
+      segments: job.segments.map((item) =>
+        item.index === segmentIndex
+          ? {
+              ...item,
+              status: "succeeded",
+              progress: 100,
+              message: "Retry segmen berhasil disimulasikan tanpa audio.",
+            }
+          : item,
+      ),
+    });
   }
   dispose() {
     this.clearTimers(this.sessionTimers);

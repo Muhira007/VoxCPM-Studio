@@ -62,6 +62,16 @@ test("consecutive tags combine delivery and event in one segment", () => {
   assert.match(result.segments[0].targetText, /^\[laughing\]/);
 });
 
+test("compiler assigns deterministic pauses without trailing silence", () => {
+  const result = compileExpressionScript(
+    "[shouts] Berhenti! [curious] Kenapa, ya [excited] Karena hemat.",
+  );
+  assert.deepEqual(
+    result.segments.map((segment) => segment.pauseAfterMs),
+    [280, 180, 0],
+  );
+});
+
 test("unknown, malformed, and dangling tags are rejected", () => {
   const unknown = compileExpressionScript("[sad] Jangan sedih.");
   assert.equal(unknown.isValid, false);
@@ -74,4 +84,19 @@ test("unknown, malformed, and dangling tags are rejected", () => {
   const dangling = compileExpressionScript("Naskah selesai. [angry]");
   assert.equal(dangling.isValid, false);
   assert.equal(dangling.issues[0].code, "dangling-tag");
+});
+
+test("expressive jobs reject more than fifty segments", () => {
+  const result = compileExpressionScript(
+    Array.from({ length: 51 }, (_, index) => `[excited] Segmen ${index + 1}.`).join(
+      " ",
+    ),
+  );
+
+  assert.equal(result.segments.length, 51);
+  assert.equal(result.isValid, false);
+  assert.equal(
+    result.issues.some((issue) => issue.code === "too-many-segments"),
+    true,
+  );
 });

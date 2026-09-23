@@ -208,12 +208,40 @@ test("price ceiling and invalid inputs prevent starting work", () => {
     validateRequest({ ...DEFAULT_DRAFT, text: "[sad] Naskah." }, [])!,
     /tidak didukung/,
   );
+  assert.equal(
+    validateRequest({ ...DEFAULT_DRAFT, text: "[excited] Naskah." }, []),
+    null,
+  );
   assert.match(
-    validateRequest({ ...DEFAULT_DRAFT, text: "[excited] Naskah." }, [])!,
-    /sintesis per segmen/,
+    validateRequest(
+      {
+        ...DEFAULT_DRAFT,
+        text: "[excited] Naskah.",
+        mode: "hifi",
+        voiceId: reference.id,
+        transcript: "Referensi.",
+      },
+      [reference],
+    )!,
+    /mengabaikan instruksi ekspresi/,
   );
   service.updateDraft({ mode: "hifi", style: "dramatic" });
   assert.equal(snapshot().draft.style, "natural");
+});
+
+test("expressive demo jobs expose segment progress and support one-segment retry", () => {
+  const { clock, service, snapshot } = setup();
+  service.updateDraft({
+    text: "[shouts] Berhenti dulu! [curious] Sudah cek detailnya?",
+  });
+  service.generate();
+  assert.equal(snapshot().jobs[0].segments.length, 2);
+  clock.advance(600);
+  assert.equal(snapshot().jobs[0].segments[0].status, "running");
+  clock.advance(2400);
+  assert.ok(snapshot().jobs[0].segments.every((segment) => segment.status === "succeeded"));
+  service.retrySegment(snapshot().jobs[0].id, 1);
+  assert.match(snapshot().jobs[0].segments[1].message, /Retry segmen/);
 });
 
 test("failure scenarios retain history and allow a new session", () => {

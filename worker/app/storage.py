@@ -6,7 +6,7 @@ import os
 import threading
 from pathlib import Path
 
-from .models import JobStatus, SynthesisRequest, WorkerJob, utc_now
+from .models import JobStatus, SynthesisRequest, WorkerJob, WorkerSegment, utc_now
 
 
 class JobConflictError(Exception):
@@ -39,6 +39,11 @@ class WorkerStore:
                     job.progress = 0
                     job.updated_at = utc_now()
                     job.message = "Worker restarted before this job completed. Use a new ID to retry."
+                    for segment in job.segments:
+                        if segment.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                            segment.status = JobStatus.FAILED
+                            segment.progress = 0
+                            segment.message = "Worker restarted before this segment completed."
                 self._jobs[job.id] = job
             self._persist()
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
@@ -61,7 +66,16 @@ class WorkerStore:
             if any(job.status in {JobStatus.QUEUED, JobStatus.RUNNING} for job in self._jobs.values()):
                 raise JobConflictError("the single-GPU worker already has an active job")
             now = utc_now()
-            job = WorkerJob(id=request.job_id, request=request, request_hash=digest, status=JobStatus.QUEUED, progress=0, created_at=now, updated_at=now)
+            segments = [
+                WorkerSegment(
+                    index=segment.index,
+                    status=JobStatus.QUEUED,
+                    progress=0,
+                    message="Segment is queued.",
+                )
+                for segment in request.segments
+            ]
+            job = WorkerJob(id=request.job_id, request=request, request_hash=digest, status=JobStatus.QUEUED, progress=0, created_at=now, updated_at=now, segments=segments)
             self._jobs[job.id] = job
             self._persist()
             return job.model_copy(deep=True), True
@@ -103,6 +117,67 @@ class WorkerStore:
             self._persist()
             return job.model_copy(deep=True)
 
+    def update_segment(
+        self,
+        job_id: str,
+        segment_index: int,
+        *,
+        status: JobStatus,
+        progress: int,
+        message: str,
+        audio_duration: float | None = None,
+        job_status: JobStatus = JobStatus.RUNNING,
+        job_progress: int | None = None,
+    ) -> WorkerJob | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job or job.status == JobStatus.CANCELLED:
+                return job.model_copy(deep=True) if job else None
+            segment = next((item for item in job.segments if item.index == segment_index), None)
+            if segment is None:
+                return None
+            segment.status = status
+            segment.progress = progress
+            segment.message = message
+            segment.audio_duration = audio_duration
+            job.status = job_status
+            if job_progress is not None:
+                job.progress = job_progress
+            job.message = message
+            job.updated_at = utc_now()
+            self._persist()
+            return job.model_copy(deep=True)
+
+    def begin_segment_retry(self, job_id: str, segment_index: int) -> WorkerJob:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                raise JobConflictError("job does not exist")
+            if job.status not in {JobStatus.SUCCEEDED, JobStatus.FAILED}:
+                raise JobConflictError("only a completed or failed job can retry a segment")
+            if any(
+                item.id != job_id and item.status in {JobStatus.QUEUED, JobStatus.RUNNING}
+                for item in self._jobs.values()
+            ):
+                raise JobConflictError("the single-GPU worker already has an active job")
+            segment = next((item for item in job.segments if item.index == segment_index), None)
+            if segment is None:
+                raise JobConflictError("segment does not exist")
+            segment.status = JobStatus.QUEUED
+            segment.progress = 0
+            segment.message = "Segment retry is queued."
+            segment.audio_duration = None
+            job.status = JobStatus.QUEUED
+            job.progress = int(
+                90 * sum(item.status == JobStatus.SUCCEEDED for item in job.segments) / len(job.segments)
+            )
+            job.output_path = None
+            job.audio_duration = None
+            job.message = f"Segment {segment_index + 1} retry is queued."
+            job.updated_at = utc_now()
+            self._persist()
+            return job.model_copy(deep=True)
+
     def cancel(self, job_id: str) -> WorkerJob | None:
         with self._lock:
             job = self._jobs.get(job_id)
@@ -112,5 +187,9 @@ class WorkerStore:
                 job.status = JobStatus.CANCELLED
                 job.message = "Cancellation accepted. Any in-flight generation will discard its output."
                 job.updated_at = utc_now()
+                for segment in job.segments:
+                    if segment.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                        segment.status = JobStatus.CANCELLED
+                        segment.message = "Segment cancelled with its parent job."
                 self._persist()
             return job.model_copy(deep=True)

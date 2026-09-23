@@ -61,14 +61,17 @@ export function ExpressionPreview({
                   VoxCPM: {segment.controlInstruction ?? segment.targetText.slice(0, segment.targetText.indexOf(" "))}
                 </small>
               )}
+              {segment.pauseAfterMs > 0 && (
+                <small>Jeda setelah segmen: {segment.pauseAfterMs} ms</small>
+              )}
             </li>
           ))}
         </ol>
       )}
       {compiled.isValid && compiled.hasExpressionTags && (
         <p className="expression-pending">
-          Preview compiler sudah siap. Pembuatan audio per segmen akan diaktifkan
-          setelah pipeline penggabungan audio tersedia.
+          Setiap segmen akan diproses terpisah, lalu dinormalisasi dan digabung
+          kembali menjadi satu WAV.
         </p>
       )}
     </section>

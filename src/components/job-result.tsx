@@ -66,6 +66,44 @@ export function JobResult({
             aria-label="Putar hasil sintesis"
           />
         )}
+        {job.segments.length > 0 && (
+          <ol className="job-segments" aria-label="Status segmen ekspresi">
+            {job.segments.map((segment) => (
+              <li key={segment.index} className={segment.status}>
+                <div>
+                  <span className="segment-number">{segment.index + 1}</span>
+                  <span className="job-segment-tags">
+                    {segment.tags.map((tag) => `[${tag}]`).join(" + ")}
+                  </span>
+                  <span className={`job-badge ${segment.status}`}>
+                    {JOB_LABELS[segment.status]}
+                  </span>
+                </div>
+                <p>{segment.text}</p>
+                <small>{segment.message}</small>
+                {(job.status === "succeeded" || job.status === "failed") && (
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      void Promise.resolve(
+                        service.retrySegment(job.id, segment.index),
+                      ).catch((error) =>
+                        toast(
+                          error instanceof Error
+                            ? error.message
+                            : "Segmen gagal diulang.",
+                        ),
+                      );
+                    }}
+                  >
+                    <RotateCcw size={13} />
+                    Ulangi segmen
+                  </button>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
         <div className="job-meta">
           <AudioLines size={13} />
           <span>{job.voiceName}</span>

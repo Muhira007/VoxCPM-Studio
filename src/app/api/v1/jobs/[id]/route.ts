@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { ApiError, errorResponse, requireStudioAccess } from "@/server/http";
-import { enforceSessionDeadline, publicJob } from "@/server/services";
+import {
+  enforceSessionDeadline,
+  mergeWorkerSegments,
+  publicJob,
+} from "@/server/services";
 import { appStore } from "@/server/store";
 import { runpodController } from "@/server/runpod-controller";
 import { validId } from "@/server/validation";
@@ -35,6 +39,7 @@ export async function GET(
           updatedAt: new Date().toISOString(),
           outputFile,
           audioDuration: worker.audio_duration,
+          segments: mergeWorkerSegments(job.segments, worker.segments),
         })) ?? job;
       await runpodController.observeWorkloadBestEffort();
     }

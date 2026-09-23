@@ -410,12 +410,12 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 ### 6B. Sintesis dan penggabungan audio ekspresif
 
-- [ ] Memperluas kontrak pekerjaan agar satu naskah menyimpan segmen, instruksi, urutan, jeda, dan status masing-masing.
-- [ ] Menghasilkan audio setiap segmen melalui Voice Design atau Controllable Cloning, dengan satu identitas suara yang konsisten.
-- [ ] Menormalisasi level, memberi jeda yang dapat diprediksi, dan menggabungkan WAV tanpa memotong awal/akhir ucapan.
-- [ ] Menyediakan retry/regenerasi satu segmen tanpa menagih ulang seluruh naskah.
-- [ ] Menguji orkestrasi serta penggabungan memakai worker palsu dan WAV sintetis tanpa saldo RunPod.
-- [ ] Mengaktifkan sintesis ekspresif hanya setelah jalur hasil parsial, pembatalan, dan penyimpanan aman.
+- [x] Memperluas kontrak pekerjaan agar satu naskah menyimpan segmen, instruksi, urutan, jeda, dan status masing-masing.
+- [x] Menghasilkan audio setiap segmen melalui Voice Design atau Controllable Cloning; cloning memakai ulang referensi yang sama, sedangkan konsistensi hasil nyata menunggu uji GPU.
+- [x] Menormalisasi level, memberi jeda yang dapat diprediksi, dan menggabungkan WAV tanpa memotong awal/akhir ucapan.
+- [x] Menyediakan retry/regenerasi satu segmen tanpa menagih ulang seluruh naskah.
+- [x] Menguji orkestrasi serta penggabungan memakai worker palsu dan WAV sintetis tanpa saldo RunPod.
+- [x] Mengaktifkan sintesis ekspresif setelah jalur hasil parsial, pembatalan, dan penyimpanan aman tersedia.
 
 ### 6C. Integrasi BEBAS dan bantuan ekspresi
 
@@ -496,11 +496,12 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 23 September 2026 | Fase 5.2C selesai tanpa saldo: ledger waktu dan estimasi biaya compute per kategori, exposure sampai hard deadline, serta storage bulanan terpisah tersedia pada state, watchdog, dan UI.                                     | 46/46 tes Node lulus, termasuk jam palsu untuk startup/loading, job aktif, idle, shutdown/error, waktu sebelum Pod ada, total biaya, dan exposure. TypeScript, ESLint, build produksi, 7/7 tes worker, UI desktop, serta [Application checks run 35832076185](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35832076185) lulus. Tidak ada mutation RunPod nyata.                       | Angka belum dibandingkan dengan invoice RunPod. Rekomendasi berikutnya tanpa saldo adalah Fase 5.3A: command preflight operasi berbayar dan template bukti siklus pertama; eksekusi GPU tetap menunggu saldo.                                                                                                                       |
 | 23 September 2026 | Fase 5.3A selesai tanpa saldo: preflight JSON, gate attestation controller, mode otomasi, dan template bukti siklus GPU pertama tersedia.                                                                                     | 50/50 tes Node, 7/7 tes worker, TypeScript, ESLint, build produksi, serta [Application checks run 35834036911](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35834036911) lulus. Cakupan mencakup laporan siap/belum siap, sanitasi rahasia, kegagalan probe, gate saldo, dan stop darurat. Preflight aktual membaca 0 Pod serta menghasilkan `mutationAttempted: false`.              | Tahap lokal tanpa saldo telah mencapai gate operasi nyata. Rekomendasi berikutnya adalah Fase 5.3B: sediakan saldo dan host selalu aktif, buat volume/data center, perluas scope key minimum, lalu selesaikan preflight sebelum satu siklus berbayar terkontrol.                                                                    |
 | 23 September 2026 | Fase 6A selesai tanpa saldo: kompiler `bebas-v1` mengenali 11 tag BEBAS, membagi segmen, menerjemahkan instruksi VoxCPM, menampilkan preview, dan menahan tag mentah dari worker.                                                       | 55/55 tes Node, TypeScript, ESLint, dan build produksi lulus. Preview serta validasi tag benar/salah diperiksa di Chrome pada desktop dan viewport ponsel. Tidak ada inferensi GPU atau mutation RunPod.                                                                                                                                | Rekomendasi berikutnya tanpa saldo adalah Fase 6B: kontrak pekerjaan per segmen, orkestrasi worker palsu, penggabungan WAV, pembatalan, dan retry satu segmen. Uji dengar dan kalibrasi ekspresi tetap memerlukan GPU setelah implementasi lokal aman.                                                                             |
+| 23 September 2026 | Fase 6B selesai tanpa saldo: API dan worker memproses naskah ekspresif berurutan, menyimpan status/hasil parsial, menormalisasi dan menggabungkan WAV, serta menyediakan retry satu segmen. | 59/59 tes Node, 9/9 tes worker, TypeScript, ESLint, dan build produksi lulus. Integrasi lokal memproses tiga ekspresi dan retry melalui Web UI/API; fake runtime membuktikan gabungan WAV 0,45 detik, regenerasi hanya pada segmen pilihan, dan pemakaian ulang referensi cloning. Tidak ada inferensi GPU atau mutation RunPod. | Rekomendasi berikutnya tanpa saldo adalah Fase 6C: kontrak JSON `bebas-v1` berversi dan impor dari BEBAS. Uji dengar identitas, transisi, kekuatan ekspresi, waktu, dan biaya tetap menunggu satu siklus GPU berbayar terkontrol. |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi aktif tanpa saldo:** kerjakan Fase 6B secara lokal dengan menambah kontrak pekerjaan per segmen, menjalankan urutan sintesis melalui fake worker, menyimpan hasil parsial, menggabungkan WAV sintetis, serta menguji pembatalan dan retry satu segmen. Tahap ini tidak boleh mengirim tag mentah sebagai satu teks ke VoxCPM.
+**Rekomendasi aktif tanpa saldo:** kerjakan Fase 6C dengan mendefinisikan JSON berversi dari BEBAS (`expressionDialect`, `script`, dan `caption`), menambahkan impor yang memvalidasi `bebas-v1`, serta menguji kompatibilitas tanpa menduplikasi generator naskah AI di VoxCPM Studio.
 
-Setelah jalur per-segmen aman, lanjutkan Fase 5.3B ketika saldo tersedia: buat Network Volume 30 GB, jalankan aplikasi/watchdog satu replica pada persistent state, selesaikan blocker preflight, lalu gunakan satu siklus berbayar terbatas untuk uji dengar dan kalibrasi ekspresi. Kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
+Setelah kontrak impor siap, lanjutkan Fase 5.3B ketika saldo tersedia: buat Network Volume 30 GB, jalankan aplikasi/watchdog satu replica pada persistent state, selesaikan blocker preflight, lalu gunakan satu siklus berbayar terbatas untuk uji dengar dan kalibrasi ekspresi. Kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.

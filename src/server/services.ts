@@ -1,4 +1,8 @@
-import type { ApiSession, ServerJob } from "./contracts";
+import type {
+  ApiSession,
+  ServerJob,
+  WorkerSegmentResponse,
+} from "./contracts";
 import { appStore } from "./store";
 import { cancelWorkerJob } from "./worker-client";
 
@@ -14,7 +18,35 @@ export function publicJob(job: ServerJob) {
     message: job.message,
     outputFile: job.outputFile,
     audioDuration: job.audioDuration,
+    segments: job.segments ?? [],
   };
+}
+
+export function mergeWorkerSegments(
+  local: ServerJob["segments"],
+  remote: WorkerSegmentResponse[],
+): ServerJob["segments"] {
+  if (!local.length) return [];
+  return local.map((segment) => {
+    const update = remote.find((item) => item.index === segment.index);
+    return update
+      ? {
+          ...segment,
+          status: update.status,
+          progress: update.progress,
+          message: update.message || segment.message,
+          audioDuration: update.audio_duration,
+        }
+      : segment;
+  });
+}
+
+function cancelledSegments(job: ServerJob, message: string) {
+  return (job.segments ?? []).map((segment) =>
+    segment.status === "queued" || segment.status === "running"
+      ? { ...segment, status: "cancelled" as const, message }
+      : segment,
+  );
 }
 
 export async function enforceSessionDeadline(): Promise<ApiSession> {
@@ -25,7 +57,7 @@ export async function enforceSessionDeadline(): Promise<ApiSession> {
   await Promise.allSettled(active.map((job) => cancelWorkerJob(job.id)));
   const now = new Date().toISOString();
   await appStore.mutate((current) => {
-    current.jobs = current.jobs.map((job) => active.some((item) => item.id === job.id) ? { ...job, status: "cancelled", updatedAt: now, message: "Cancelled because the local session deadline was reached." } : job);
+    current.jobs = current.jobs.map((job) => active.some((item) => item.id === job.id) ? { ...job, status: "cancelled", updatedAt: now, message: "Cancelled because the local session deadline was reached.", segments: cancelledSegments(job, "Segment cancelled because the session deadline was reached.") } : job);
     current.session = { ...current.session, status: "off", expiresAt: null, endedAt: now, message: "Local session deadline reached. Worker cancellation was requested." };
   });
   return (await appStore.read()).session;
@@ -38,7 +70,7 @@ export async function stopSession(message = "Local worker session stopped."): Pr
   await Promise.allSettled(active.map((job) => cancelWorkerJob(job.id)));
   const now = new Date().toISOString();
   await appStore.mutate((current) => {
-    current.jobs = current.jobs.map((job) => active.some((item) => item.id === job.id) ? { ...job, status: "cancelled", updatedAt: now, message: "Cancelled because the local session stopped." } : job);
+    current.jobs = current.jobs.map((job) => active.some((item) => item.id === job.id) ? { ...job, status: "cancelled", updatedAt: now, message: "Cancelled because the local session stopped.", segments: cancelledSegments(job, "Segment cancelled because the local session stopped.") } : job);
     current.session = { ...current.session, status: "off", expiresAt: null, endedAt: now, message };
   });
   return (await appStore.read()).session;

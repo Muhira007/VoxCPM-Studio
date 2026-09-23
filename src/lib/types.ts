@@ -28,6 +28,19 @@ export interface SynthesisRequest {
   style: StylePreset;
 }
 
+export interface SynthesisSegment {
+  index: number;
+  tags: string[];
+  text: string;
+  controlInstruction: string | null;
+  targetText: string;
+  pauseAfterMs: number;
+  status: JobStatus;
+  progress: number;
+  message: string;
+  audioDuration: number | null;
+}
+
 export interface SynthesisJob {
   id: string;
   request: SynthesisRequest;
@@ -39,6 +52,7 @@ export interface SynthesisJob {
   // Demo jobs never receive a fabricated output URL or audio duration.
   audioUrl: string | null;
   audioDuration: number | null;
+  segments: SynthesisSegment[];
 }
 
 export interface GpuSession {
@@ -81,6 +95,7 @@ export interface StudioService {
   extendSession(): void | Promise<void>;
   generate(): void | Promise<void>;
   cancelJob(id: string): void | Promise<void>;
+  retrySegment(jobId: string, segmentIndex: number): void | Promise<void>;
   addVoice(voice: Voice, file?: File): string | Promise<string>;
   editVoice(id: string, name: string, description: string): void | Promise<void>;
   removeVoice(id: string): void | Promise<void>;

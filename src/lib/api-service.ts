@@ -36,6 +36,7 @@ interface ApiJob {
   message: string;
   outputFile: string | null;
   audioDuration: number | null;
+  segments: SynthesisJob["segments"];
 }
 
 interface ApiVoice {
@@ -90,6 +91,7 @@ function mapJob(job: ApiJob): SynthesisJob {
     message: job.message,
     audioUrl: job.outputFile ? `/api/v1/jobs/${encodeURIComponent(job.id)}/audio` : null,
     audioDuration: job.audioDuration,
+    segments: Array.isArray(job.segments) ? job.segments : [],
   };
 }
 
@@ -411,6 +413,24 @@ export class ApiStudioService implements StudioService {
     this.publish({
       jobs: this.snapshot.jobs.map((job) => (job.id === id ? updated : job)),
     });
+  }
+  async retrySegment(jobId: string, segmentIndex: number) {
+    if (this.actionBusy) return;
+    this.actionBusy = true;
+    try {
+      const response = await this.request<{ job: ApiJob }>(
+        `/api/v1/jobs/${encodeURIComponent(jobId)}/segments/${segmentIndex}/retry`,
+        { method: "POST" },
+      );
+      const updated = mapJob(response.job);
+      this.publish({
+        jobs: this.snapshot.jobs.map((job) =>
+          job.id === jobId ? updated : job,
+        ),
+      });
+    } finally {
+      this.actionBusy = false;
+    }
   }
   async addVoice(voice: Voice, file?: File): Promise<string> {
     if (!file) throw new Error("Berkas referensi diperlukan untuk unggahan server.");

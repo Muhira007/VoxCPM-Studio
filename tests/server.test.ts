@@ -30,7 +30,7 @@ async function removeTemporary(directory: string) {
 
 function job(id: string): ServerJob {
   const now = new Date().toISOString();
-  return { id, idempotencyKey: `key_${id}`, requestHash: requestHash(request), request, voiceName: "Built-in", status: "queued", progress: 0, createdAt: now, updatedAt: now, message: "Queued", outputFile: null, audioDuration: null };
+  return { id, idempotencyKey: `key_${id}`, requestHash: requestHash(request), request, voiceName: "Built-in", status: "queued", progress: 0, createdAt: now, updatedAt: now, message: "Queued", outputFile: null, audioDuration: null, segments: [] };
 }
 
 test("application store persists sessions, jobs, and voice metadata atomically", async () => {
@@ -87,6 +87,28 @@ test("server request validation enforces mode-specific contracts", () => {
   assert.throws(() => parseSynthesisRequest({ ...request, mode: "clone" }), /voiceId/);
   assert.throws(() => parseSynthesisRequest({ ...request, mode: "hifi", voiceId: "voice_backend_01" }), /transcript/);
   assert.throws(() => parseSynthesisRequest({ ...request, text: "[sad] Naskah." }), /tidak didukung/);
-  assert.throws(() => parseSynthesisRequest({ ...request, text: "[excited] Naskah." }), /segmented synthesis/);
+  assert.equal(parseSynthesisRequest({ ...request, text: "[excited] Naskah." }).text, "[excited] Naskah.");
+  assert.throws(
+    () =>
+      parseSynthesisRequest({
+        ...request,
+        text: "[excited] Naskah.",
+        mode: "hifi",
+        voiceId: "voice_backend_01",
+        transcript: "Referensi.",
+      }),
+    /ignores expression control/,
+  );
   assert.throws(() => parseSynthesisRequest({ ...request, unsupported: true }), /unsupported/);
+});
+
+test("saving a retried job atomically replaces its previous WAV", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const name = await store.saveOutput("job_backend_retry1", new Uint8Array([1, 2]));
+    await store.saveOutput("job_backend_retry1", new Uint8Array([3, 4, 5]));
+    assert.deepEqual(await readFile(store.outputPath(name)), Buffer.from([3, 4, 5]));
+  } finally {
+    await removeTemporary(directory);
+  }
 });

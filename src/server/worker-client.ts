@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import { serverConfig, validateServerConfiguration } from "./config.ts";
-import type { WorkerJobResponse } from "./contracts.ts";
+import type { WorkerJobResponse, WorkerSegmentResponse } from "./contracts.ts";
 import { ApiError } from "./http.ts";
 
 const MAX_WORKER_AUDIO_BYTES = 100 * 1024 * 1024;
@@ -75,7 +75,29 @@ function workerJob(value: unknown): WorkerJobResponse {
     throw new ApiError(502, "Worker returned an invalid audio duration.");
   if ((data.output_path === null) !== (data.audio_duration === null))
     throw new ApiError(502, "Worker returned incomplete audio metadata.");
-  return data as unknown as WorkerJobResponse;
+  const rawSegments = data.segments === undefined ? [] : data.segments;
+  if (!Array.isArray(rawSegments))
+    throw new ApiError(502, "Worker returned invalid segment metadata.");
+  const segments = rawSegments.map((segment): WorkerSegmentResponse => {
+    if (!segment || typeof segment !== "object" || Array.isArray(segment))
+      throw new ApiError(502, "Worker returned an invalid segment response.");
+    const item = segment as Record<string, unknown>;
+    if (
+      !Number.isInteger(item.index) ||
+      Number(item.index) < 0 ||
+      typeof item.status !== "string" ||
+      !statuses.has(item.status) ||
+      typeof item.progress !== "number" ||
+      item.progress < 0 ||
+      item.progress > 100 ||
+      (item.message !== null && typeof item.message !== "string") ||
+      (item.audio_duration !== null &&
+        (typeof item.audio_duration !== "number" || item.audio_duration <= 0))
+    )
+      throw new ApiError(502, "Worker returned an invalid segment response.");
+    return item as unknown as WorkerSegmentResponse;
+  });
+  return { ...(data as unknown as WorkerJobResponse), segments };
 }
 
 export async function workerReady(): Promise<boolean> {
@@ -106,6 +128,18 @@ export async function cancelWorkerJob(id: string): Promise<WorkerJobResponse> {
       method: "POST",
       body: "{}",
     }),
+  );
+}
+
+export async function retryWorkerSegment(
+  id: string,
+  segmentIndex: number,
+): Promise<WorkerJobResponse> {
+  return workerJob(
+    await callWorker(
+      `/v1/jobs/${encodeURIComponent(id)}/segments/${segmentIndex}/retry`,
+      { method: "POST", body: "{}" },
+    ),
   );
 }
 

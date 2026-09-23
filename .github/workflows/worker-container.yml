@@ -165,3 +165,45 @@ jobs:
           assert job["id"] == "job-ci-0001"
           assert job["status"] == "succeeded"
           PY
+
+          status_code="$(curl --silent \
+            --output /tmp/expression-job.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --header "X-Worker-Key: ${WORKER_API_KEY}" \
+            --data '{"job_id":"job-ci-expr-001","text":"[shouts] Berhenti! [curious] Kenapa?","mode":"tts","style":"natural","segments":[{"index":0,"text":"Berhenti!","control_instruction":"Shout with strong emphasis.","pause_after_ms":280},{"index":1,"text":"Kenapa?","control_instruction":"Use a curious tone.","pause_after_ms":0}]}' \
+            http://127.0.0.1:8001/v1/jobs)"
+          test "${status_code}" = "202"
+
+          for attempt in {1..30}; do
+            curl --fail --silent \
+              --header "X-Worker-Key: ${WORKER_API_KEY}" \
+              http://127.0.0.1:8001/v1/jobs/job-ci-expr-001 \
+              > /tmp/expression-job.json
+            job_status="$(python3 -c 'import json; print(json.load(open("/tmp/expression-job.json", encoding="utf-8"))["status"])')"
+            if [ "${job_status}" = "succeeded" ]; then
+              break
+            fi
+            sleep 1
+          done
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/expression-job.json", encoding="utf-8") as handle:
+              job = json.load(handle)
+          assert job["status"] == "succeeded"
+          assert [segment["status"] for segment in job["segments"]] == [
+              "succeeded",
+              "succeeded",
+          ]
+          assert job["output_path"] is None
+          PY
+
+          test "$(curl --silent \
+            --output /tmp/expression-retry.json \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header "X-Worker-Key: ${WORKER_API_KEY}" \
+            http://127.0.0.1:8001/v1/jobs/job-ci-expr-001/segments/1/retry)" = "202"

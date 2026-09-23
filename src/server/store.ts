@@ -60,7 +60,12 @@ export class AppStore {
     const raw = await readFile(this.stateFile, "utf8");
     const parsed: unknown = JSON.parse(raw);
     if (!isState(parsed)) throw new Error("Server state has an unsupported or invalid format.");
-    return structuredClone(parsed);
+    const state = structuredClone(parsed) as PersistedAppState;
+    state.jobs = state.jobs.map((job) => ({
+      ...job,
+      segments: Array.isArray(job.segments) ? job.segments : [],
+    }));
+    return state;
   }
 
   async mutate<T>(operation: (state: PersistedAppState) => T | Promise<T>): Promise<T> {
@@ -121,10 +126,13 @@ export class AppStore {
     await this.initialize();
     const storageName = `${jobId}.wav`;
     const destination = this.outputPath(storageName);
+    const temporary = `${destination}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      await writeFile(destination, audio, { flag: "wx" });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      await writeFile(temporary, audio, { flag: "wx" });
+      await rm(destination, { force: true });
+      await rename(temporary, destination);
+    } finally {
+      await rm(temporary, { force: true });
     }
     return storageName;
   }

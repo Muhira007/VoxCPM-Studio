@@ -1,4 +1,4 @@
-import type { JobStatus, SynthesisRequest } from "@/lib/types";
+import type { JobStatus, SynthesisRequest, SynthesisSegment } from "@/lib/types";
 
 export type ApiSessionStatus = "off" | "loading" | "ready" | "stopping" | "error";
 
@@ -24,6 +24,7 @@ export interface ServerJob {
   message: string;
   outputFile: string | null;
   audioDuration: number | null;
+  segments: SynthesisSegment[];
 }
 
 export interface ServerVoice {
@@ -58,5 +59,14 @@ export interface WorkerJobResponse {
   progress: number;
   message: string | null;
   output_path: string | null;
+  audio_duration: number | null;
+  segments: WorkerSegmentResponse[];
+}
+
+export interface WorkerSegmentResponse {
+  index: number;
+  status: JobStatus;
+  progress: number;
+  message: string | null;
   audio_duration: number | null;
 }

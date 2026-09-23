@@ -22,17 +22,17 @@ export function parseSynthesisRequest(value: unknown): SynthesisRequest {
   const transcript = typeof value.transcript === "string" ? value.transcript : "";
   const style = typeof value.style === "string" ? value.style : "";
   if (!text.trim() || text.length > 5000) throw new InputError("text must contain 1–5000 characters.");
+  if (!modes.has(mode)) throw new InputError("mode is invalid.");
+  if (!styles.has(style)) throw new InputError("style is invalid.");
   const expression = compileExpressionScript(text);
   const expressionError = expression.issues.find((issue) => issue.severity === "error");
   if (expressionError) throw new InputError(expressionError.message);
-  if (expression.hasExpressionTags) throw new InputError("Expressive segmented synthesis is not enabled yet.");
-  if (!modes.has(mode)) throw new InputError("mode is invalid.");
-  if (!styles.has(style)) throw new InputError("style is invalid.");
   if (voiceId.length > 120 || description.length > 1000 || transcript.length > 5000) throw new InputError("One or more request fields exceed their limit.");
   if (mode === "design" && !description.trim()) throw new InputError("Voice Design requires description.");
   if ((mode === "clone" || mode === "hifi") && !voiceId) throw new InputError("Cloning requires voiceId.");
   if (mode === "hifi" && !transcript.trim()) throw new InputError("Hi-Fi requires transcript.");
   if (mode === "hifi" && style !== "natural") throw new InputError("Hi-Fi does not accept a style override.");
+  if (mode === "hifi" && expression.hasExpressionTags) throw new InputError("Hi-Fi ignores expression control. Use clone mode for expressive scripts.");
   return { text, mode: mode as SynthesisRequest["mode"], voiceId, description, transcript, style: style as SynthesisRequest["style"] };
 }
 

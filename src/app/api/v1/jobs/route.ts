@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { compileExpressionScript } from "@/lib/expression-script";
 import type { ServerJob } from "@/server/contracts";
 import {
   ApiError,
@@ -7,7 +8,11 @@ import {
   readJson,
   requireStudioAccess,
 } from "@/server/http";
-import { enforceSessionDeadline, publicJob } from "@/server/services";
+import {
+  enforceSessionDeadline,
+  mergeWorkerSegments,
+  publicJob,
+} from "@/server/services";
 import { appStore } from "@/server/store";
 import { runpodController } from "@/server/runpod-controller";
 import {
@@ -44,6 +49,7 @@ export async function POST(request: Request) {
         "Idempotency-Key must contain 8–100 letters, numbers, underscores, or hyphens.",
       );
     const synthesis = parseSynthesisRequest(await readJson(request));
+    const compiledExpression = compileExpressionScript(synthesis.text);
     const digest = requestHash(synthesis);
     const scenario = request.headers.get("x-demo-scenario") || "normal";
     if (!["normal", "failure", "slow"].includes(scenario))
@@ -101,6 +107,16 @@ export async function POST(request: Request) {
           "The selected reference voice does not exist on the application server.",
         );
       const now = new Date().toISOString();
+      const segments = compiledExpression.hasExpressionTags
+        ? compiledExpression.segments.map((segment) => ({
+            ...segment,
+            tags: [...segment.tags],
+            status: "queued" as const,
+            progress: 0,
+            message: "Menunggu worker memproses segmen.",
+            audioDuration: null,
+          }))
+        : [];
       const job: ServerJob = {
         id: `job_${randomUUID().replaceAll("-", "")}`,
         idempotencyKey,
@@ -118,6 +134,7 @@ export async function POST(request: Request) {
         message: "Queued for the configured worker.",
         outputFile: null,
         audioDuration: null,
+        segments,
       };
       state.jobs.unshift(job);
       return {
@@ -151,12 +168,19 @@ export async function POST(request: Request) {
         style: synthesis.style,
         reference_path: workerReferencePath,
         scenario,
+        segments: selection.job.segments.map((segment) => ({
+          index: segment.index,
+          text: segment.targetText,
+          control_instruction: segment.controlInstruction,
+          pause_after_ms: segment.pauseAfterMs,
+        })),
       });
       const updated = await appStore.updateJob(selection.job.id, {
         status: worker.status,
         progress: worker.progress,
         message: worker.message || selection.job.message,
         updatedAt: new Date().toISOString(),
+        segments: mergeWorkerSegments(selection.job.segments, worker.segments),
       });
       await runpodController.observeWorkloadBestEffort();
       return NextResponse.json(
