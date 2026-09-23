@@ -12,6 +12,7 @@ import type {
   SynthesisRequest,
   Voice,
 } from "./types.ts";
+import { compileExpressionScript } from "./expression-script.ts";
 
 type Timer = ReturnType<typeof setTimeout>;
 export interface Runtime {
@@ -42,6 +43,15 @@ export function validateRequest(
   if (!request.text.trim()) return "Tulis naskah terlebih dahulu.";
   if (request.text.length > MAX_TEXT)
     return "Naskah dibatasi 5.000 karakter per pekerjaan demo.";
+  const expression = compileExpressionScript(request.text);
+  const expressionError = expression.issues.find(
+    (issue) => issue.severity === "error",
+  );
+  if (expressionError) return expressionError.message;
+  if (expression.hasExpressionTags && request.mode === "hifi")
+    return "Hi-Fi mengabaikan instruksi ekspresi. Gunakan Voice Cloning agar ekspresi dapat diarahkan.";
+  if (expression.hasExpressionTags)
+    return "Naskah ekspresif sudah valid, tetapi sintesis per segmen belum diaktifkan.";
   if (request.mode === "design" && !request.description.trim())
     return "Isi deskripsi karakter suara yang ingin dibuat.";
   if (request.mode === "clone" || request.mode === "hifi") {

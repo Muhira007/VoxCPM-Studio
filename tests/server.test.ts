@@ -86,5 +86,7 @@ test("server request validation enforces mode-specific contracts", () => {
   assert.throws(() => parseSynthesisRequest({ ...request, mode: "design" }), /description/);
   assert.throws(() => parseSynthesisRequest({ ...request, mode: "clone" }), /voiceId/);
   assert.throws(() => parseSynthesisRequest({ ...request, mode: "hifi", voiceId: "voice_backend_01" }), /transcript/);
+  assert.throws(() => parseSynthesisRequest({ ...request, text: "[sad] Naskah." }), /tidak didukung/);
+  assert.throws(() => parseSynthesisRequest({ ...request, text: "[excited] Naskah." }), /segmented synthesis/);
   assert.throws(() => parseSynthesisRequest({ ...request, unsupported: true }), /unsupported/);
 });

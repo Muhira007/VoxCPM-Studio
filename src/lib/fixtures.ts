@@ -62,6 +62,8 @@ export const STYLES: { id: StylePreset; label: string; description: string }[] =
   ];
 export const EXAMPLE_TEXT =
   "Setiap cerita punya suaranya sendiri.\n\nAda yang dimulai dengan bisikan, ada yang hadir penuh semangat. Apa pun ceritamu, berikan ruang untuk didengar.\n\nMari mulai sesuatu yang berarti, satu kalimat pada satu waktu.";
+export const EXPRESSION_EXAMPLE_TEXT =
+  "[shouts] Jangan checkout dulu! [curious] Kenapa? Karena ada satu hal yang wajib kamu cek. [excited] Kalau kamu suka hasil yang praktis dan hemat waktu, produk ini layak masuk daftar belanja. [whispers] Tapi stok promonya biasanya tidak lama.";
 export const EXAMPLE_VOICES: Voice[] = [
   {
     id: "example-narator",

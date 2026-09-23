@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { SynthesisRequest } from "@/lib/types";
+import { compileExpressionScript } from "../lib/expression-script.ts";
 
 const modes = new Set(["tts", "design", "clone", "hifi"]);
 const styles = new Set(["natural", "calm", "cheerful", "dramatic"]);
@@ -21,6 +22,10 @@ export function parseSynthesisRequest(value: unknown): SynthesisRequest {
   const transcript = typeof value.transcript === "string" ? value.transcript : "";
   const style = typeof value.style === "string" ? value.style : "";
   if (!text.trim() || text.length > 5000) throw new InputError("text must contain 1–5000 characters.");
+  const expression = compileExpressionScript(text);
+  const expressionError = expression.issues.find((issue) => issue.severity === "error");
+  if (expressionError) throw new InputError(expressionError.message);
+  if (expression.hasExpressionTags) throw new InputError("Expressive segmented synthesis is not enabled yet.");
   if (!modes.has(mode)) throw new InputError("mode is invalid.");
   if (!styles.has(style)) throw new InputError("style is invalid.");
   if (voiceId.length > 120 || description.length > 1000 || transcript.length > 5000) throw new InputError("One or more request fields exceed their limit.");

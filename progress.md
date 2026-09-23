@@ -397,6 +397,34 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 ## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
+### 6A. Kompiler ekspresi BEBAS tanpa GPU
+
+- [x] Menetapkan dialek aplikasi `bebas-v1` agar format naskah tidak terikat langsung pada nama engine ElevenLabs.
+- [x] Mendukung seluruh 11 tag keluaran BEBAS: `[whispers]`, `[laughs]`, `[sighs]`, `[excited]`, `[angry]`, `[gasp]`, `[shouts]`, `[crying]`, `[panicked]`, `[curious]`, dan `[sarcastic]`.
+- [x] Memecah naskah menjadi segmen ekspresi, termasuk beberapa tag berurutan pada satu segmen, serta menghasilkan teks bersih tanpa tag untuk subtitle/metadata.
+- [x] Menerjemahkan emosi menjadi Control Instruction VoxCPM dan alias aksi native `[laughing]` serta `[sigh]`; `[gasp]` ditandai eksperimental sampai ada uji dengar.
+- [x] Menolak tag tidak dikenal, kurung siku tidak lengkap, dan tag tanpa teks sebelum permintaan mencapai worker.
+- [x] Menampilkan preview segmen, arti tag, dan instruksi VoxCPM pada Studio untuk desktop dan ponsel.
+- [x] Menahan sintesis naskah bertag sampai pipeline per-segmen tersedia agar tag mentah tidak ikut dibaca atau diabaikan model.
+- [x] Menguji parser, seluruh whitelist BEBAS, kombinasi tag, validasi frontend/backend, TypeScript, lint, dan build produksi tanpa GPU.
+
+### 6B. Sintesis dan penggabungan audio ekspresif
+
+- [ ] Memperluas kontrak pekerjaan agar satu naskah menyimpan segmen, instruksi, urutan, jeda, dan status masing-masing.
+- [ ] Menghasilkan audio setiap segmen melalui Voice Design atau Controllable Cloning, dengan satu identitas suara yang konsisten.
+- [ ] Menormalisasi level, memberi jeda yang dapat diprediksi, dan menggabungkan WAV tanpa memotong awal/akhir ucapan.
+- [ ] Menyediakan retry/regenerasi satu segmen tanpa menagih ulang seluruh naskah.
+- [ ] Menguji orkestrasi serta penggabungan memakai worker palsu dan WAV sintetis tanpa saldo RunPod.
+- [ ] Mengaktifkan sintesis ekspresif hanya setelah jalur hasil parsial, pembatalan, dan penyimpanan aman.
+
+### 6C. Integrasi BEBAS dan bantuan ekspresi
+
+- [ ] Mendefinisikan ekspor/impor JSON berversi dari BEBAS dengan `expressionDialect: "bebas-v1"`, `script`, dan `caption`.
+- [ ] Menambahkan impor ke VoxCPM Studio tanpa membuat generator naskah lengkap kedua.
+- [ ] Menyediakan bantuan AI opsional yang hanya menambahkan ekspresi pada naskah polos setelah pipeline dasar stabil.
+
+### 6D. Validasi kualitas suara dan penyelesaian MVP
+
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
 - [ ] Menguji TTS Indonesia, voice design, cloning dengan gaya, dan Hi-Fi cloning secara terpisah.
 - [ ] Menyiapkan 20–30 naskah uji: narasi, dialog, rupiah, tanggal, singkatan, nama, dan campuran Indonesia–Inggris.
@@ -467,11 +495,12 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 23 September 2026 | Fase 5.2B selesai tanpa saldo: admission ditutup lima menit sebelum hard deadline, drain membatalkan job aktif secara idempoten, dan UI menampilkan countdown serta alasan stop.                                              | 44/44 tes Node dan 7/7 tes worker lulus, termasuk drain satu kali, kegagalan cancel worker, penolakan admission, dan hard stop yang tetap dominan. TypeScript, ESLint, build produksi, UI ponsel, serta [Application checks run 35828868692](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35828868692) lulus; tidak ada mutation RunPod nyata.                                        | Cutoff belum dikalibrasi dengan durasi inferensi GPU. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2C: ledger estimasi compute startup/running/idle, exposure sampai hard deadline, dan biaya storage terpisah di UI.                                                                                                           |
 | 23 September 2026 | Fase 5.2C selesai tanpa saldo: ledger waktu dan estimasi biaya compute per kategori, exposure sampai hard deadline, serta storage bulanan terpisah tersedia pada state, watchdog, dan UI.                                     | 46/46 tes Node lulus, termasuk jam palsu untuk startup/loading, job aktif, idle, shutdown/error, waktu sebelum Pod ada, total biaya, dan exposure. TypeScript, ESLint, build produksi, 7/7 tes worker, UI desktop, serta [Application checks run 35832076185](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35832076185) lulus. Tidak ada mutation RunPod nyata.                       | Angka belum dibandingkan dengan invoice RunPod. Rekomendasi berikutnya tanpa saldo adalah Fase 5.3A: command preflight operasi berbayar dan template bukti siklus pertama; eksekusi GPU tetap menunggu saldo.                                                                                                                       |
 | 23 September 2026 | Fase 5.3A selesai tanpa saldo: preflight JSON, gate attestation controller, mode otomasi, dan template bukti siklus GPU pertama tersedia.                                                                                     | 50/50 tes Node, 7/7 tes worker, TypeScript, ESLint, build produksi, serta [Application checks run 35834036911](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35834036911) lulus. Cakupan mencakup laporan siap/belum siap, sanitasi rahasia, kegagalan probe, gate saldo, dan stop darurat. Preflight aktual membaca 0 Pod serta menghasilkan `mutationAttempted: false`.              | Tahap lokal tanpa saldo telah mencapai gate operasi nyata. Rekomendasi berikutnya adalah Fase 5.3B: sediakan saldo dan host selalu aktif, buat volume/data center, perluas scope key minimum, lalu selesaikan preflight sebelum satu siklus berbayar terkontrol.                                                                    |
+| 23 September 2026 | Fase 6A selesai tanpa saldo: kompiler `bebas-v1` mengenali 11 tag BEBAS, membagi segmen, menerjemahkan instruksi VoxCPM, menampilkan preview, dan menahan tag mentah dari worker.                                                       | 55/55 tes Node, TypeScript, ESLint, dan build produksi lulus. Preview serta validasi tag benar/salah diperiksa di Chrome pada desktop dan viewport ponsel. Tidak ada inferensi GPU atau mutation RunPod.                                                                                                                                | Rekomendasi berikutnya tanpa saldo adalah Fase 6B: kontrak pekerjaan per segmen, orkestrasi worker palsu, penggabungan WAV, pembatalan, dan retry satu segmen. Uji dengar dan kalibrasi ekspresi tetap memerlukan GPU setelah implementasi lokal aman.                                                                             |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi berikutnya memerlukan saldo dan host control plane yang selalu aktif:** kerjakan Fase 5.3B dengan membuat Network Volume 30 GB pada data center yang mendukung GPU terpilih, menjalankan aplikasi/watchdog satu replica pada persistent state, menguji alert, dan menaikkan izin key hanya untuk create/start/stop. Pertahankan write lock sampai semua blocker selain `write_gateway_enabled` selesai, lalu aktifkan flag itu paling akhir dan wajibkan preflight `--require-ready` lulus.
+**Rekomendasi aktif tanpa saldo:** kerjakan Fase 6B secara lokal dengan menambah kontrak pekerjaan per segmen, menjalankan urutan sintesis melalui fake worker, menyimpan hasil parsial, menggabungkan WAV sintetis, serta menguji pembatalan dan retry satu segmen. Tahap ini tidak boleh mengirim tag mentah sebagai satu teks ke VoxCPM.
 
-Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi. Isi template bukti, bandingkan ledger dengan invoice, lalu kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
+Setelah jalur per-segmen aman, lanjutkan Fase 5.3B ketika saldo tersedia: buat Network Volume 30 GB, jalankan aplikasi/watchdog satu replica pada persistent state, selesaikan blocker preflight, lalu gunakan satu siklus berbayar terbatas untuk uji dengar dan kalibrasi ekspresi. Kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
 
 Dokumen ini menjadi checklist utama. Ubah status hanya setelah hasil tersedia dan pemeriksaannya tercatat.

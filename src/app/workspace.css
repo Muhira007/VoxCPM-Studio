@@ -12,6 +12,134 @@
   flex: 1;
   min-height: 240px;
 }
+.editor-examples {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.expression-preview {
+  margin: 0 24px 22px;
+  padding: 16px;
+  border: 1px solid #ead8ca;
+  border-radius: 10px;
+  background: #fffaf6;
+}
+.expression-heading,
+.expression-heading > div,
+.expression-status,
+.expression-segment-top,
+.expression-tags {
+  display: flex;
+  align-items: center;
+}
+.expression-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+.expression-heading > div {
+  gap: 8px;
+  color: #3e4652;
+  font-size: 14px;
+}
+.expression-heading > div svg {
+  color: var(--orange);
+}
+.expression-status {
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.expression-status.valid {
+  color: #35724d;
+  background: #e9f5ed;
+}
+.expression-status.invalid {
+  color: #a64a40;
+  background: #ffebe7;
+}
+.expression-summary,
+.expression-pending {
+  color: #737985;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.expression-issues {
+  margin-top: 12px;
+  padding: 10px 12px 10px 28px;
+  border-radius: 8px;
+  background: #fff0ed;
+  color: #97453d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.expression-issues li.warning {
+  color: #85601f;
+}
+.expression-segments {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin-top: 14px;
+}
+.expression-segments > li {
+  padding: 12px;
+  border: 1px solid #ede3dc;
+  border-radius: 8px;
+  background: #fff;
+}
+.expression-segment-top {
+  gap: 8px;
+}
+.segment-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  background: #f5e7de;
+  color: #a64f2e;
+  font-size: 11px;
+  font-weight: 650;
+}
+.expression-tags {
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.expression-tags > span {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: #fff0e8;
+  color: #a44f30;
+  font-size: 11px;
+  font-weight: 550;
+}
+.expression-tags > span.natural {
+  background: #f0f2f5;
+  color: #69717d;
+}
+.expression-segments p {
+  color: #414853;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.expression-segments small {
+  display: block;
+  color: #818792;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+.expression-pending {
+  padding-top: 10px;
+  border-top: 1px solid #eadfd8;
+}
 .mobile-nav .nav-link:hover {
   background: #f4f5f7;
   color: #303640;

@@ -204,6 +204,14 @@ test("price ceiling and invalid inputs prevent starting work", () => {
     ])!,
     /transkrip/,
   );
+  assert.match(
+    validateRequest({ ...DEFAULT_DRAFT, text: "[sad] Naskah." }, [])!,
+    /tidak didukung/,
+  );
+  assert.match(
+    validateRequest({ ...DEFAULT_DRAFT, text: "[excited] Naskah." }, [])!,
+    /sintesis per segmen/,
+  );
   service.updateDraft({ mode: "hifi", style: "dramatic" });
   assert.equal(snapshot().draft.style, "natural");
 });

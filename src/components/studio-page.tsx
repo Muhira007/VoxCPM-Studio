@@ -17,13 +17,21 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { readAudio } from "@/lib/audio-storage";
-import { EXAMPLE_TEXT, GPU_LABELS, MODES, STYLES } from "@/lib/fixtures";
+import { compileExpressionScript } from "@/lib/expression-script";
+import {
+  EXAMPLE_TEXT,
+  EXPRESSION_EXAMPLE_TEXT,
+  GPU_LABELS,
+  MODES,
+  STYLES,
+} from "@/lib/fixtures";
 import { validateRequest } from "@/lib/demo-service";
 import { AudioPreview } from "./audio-preview";
 import { JobResult } from "./job-result";
 import { useStudio } from "./studio-provider";
 import { EmptyState, ErrorMessage, Modal, useToast, VoiceMark } from "./ui";
 import { VoiceDialog } from "./voice-dialog";
+import { ExpressionPreview } from "./expression-preview";
 
 export function StudioPage() {
   const { state, service } = useStudio();
@@ -43,6 +51,7 @@ export function StudioPage() {
   const loadingGpu = ["provisioning", "loading", "stopping"].includes(
     session.status,
   );
+  const expressionScript = compileExpressionScript(draft.text);
   async function primaryAction() {
     setError("");
     try {
@@ -148,22 +157,36 @@ export function StudioPage() {
               aria-describedby="script-count"
             />
             <div className="editor-meta">
-              <button
-                className="text-button"
-                onClick={() => {
-                  service.updateDraft({ text: EXAMPLE_TEXT });
-                  setError("");
-                  toast("Contoh naskah dimuat.");
-                }}
-              >
-                <BookOpenText size={15} />
-                Gunakan contoh
-              </button>
+              <div className="editor-examples">
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    service.updateDraft({ text: EXAMPLE_TEXT });
+                    setError("");
+                    toast("Contoh naskah dimuat.");
+                  }}
+                >
+                  <BookOpenText size={15} />
+                  Contoh biasa
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    service.updateDraft({ text: EXPRESSION_EXAMPLE_TEXT });
+                    setError("");
+                    toast("Contoh naskah berekspresi dimuat.");
+                  }}
+                >
+                  <Sparkles size={15} />
+                  Contoh ekspresi
+                </button>
+              </div>
               <span id="script-count">
                 {draft.text.length.toLocaleString("id-ID")} / 5.000 karakter
               </span>
             </div>
           </div>
+          <ExpressionPreview compiled={expressionScript} />
           {draft.mode === "design" && (
             <div className="extra-input">
               <label className="field-label">
