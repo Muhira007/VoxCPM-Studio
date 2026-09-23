@@ -7,7 +7,7 @@ import {
 } from "../src/server/runpod-preflight.ts";
 
 const image =
-  "ghcr.io/muhira007/voxcpm-studio-worker@sha256:90ba964343f769a428259a59ac0acd8523de82c02f4ffddd82e2e8d78d715fbd";
+  "ghcr.io/muhira007/voxcpm-studio-worker@sha256:763938c78e0d1be4ccb968ab6dd7a351b6a14be5b7f8001e7c04540df7df6071";
 
 function overview(): RunpodOverview {
   return {
