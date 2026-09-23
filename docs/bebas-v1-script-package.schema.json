@@ -13,7 +13,7 @@
   "properties": {
     "schema": { "const": "voxcpm-studio-script" },
     "version": { "const": 1 },
-    "expressionDialect": { "const": "bebas-v1" },
+    "expressionDialect": { "enum": ["bebas-v1", "bebas-v2"] },
     "script": { "type": "string", "minLength": 1, "maxLength": 5000 },
     "caption": { "type": "string", "maxLength": 20000 }
   },

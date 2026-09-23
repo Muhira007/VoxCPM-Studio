@@ -1,7 +1,7 @@
 # Progress — VoxCPM Studio
 
 Terakhir diperbarui: 23 September 2026
-Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, preflight operasi berbayar lokal Fase 5, serta implementasi inti ekspresi dan integrasi BEBAS Fase 6A–6C selesai; resource GPU menunggu saldo, host selalu aktif, dan volume/data center aktual.**
+Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, preflight operasi berbayar lokal Fase 5, serta implementasi ekspresi dan integrasi BEBAS sampai dialek affiliate `bebas-v2` selesai; resource GPU menunggu saldo, host selalu aktif, dan volume/data center aktual.**
 Fase aktif: **Persiapan Fase 6D tanpa saldo — menyusun korpus uji Indonesia, panduan rekaman referensi, dan pemeriksaan teknis WAV sebelum validasi suara pada GPU.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
@@ -427,6 +427,15 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 **Status integrasi:** kontrak `voxcpm-studio-script` versi 1 dan alur ekspor/impor selesai. `caption` tetap bermakna caption postingan BEBAS dan tidak dikirim ke TTS. Bantuan AI tambahan sengaja belum dibuat karena BEBAS sudah menjadi sumber generator dan pemanggilan provider AI tidak diperlukan untuk integrasi lokal ini.
 
+#### 6C.1. Dialek affiliate `bebas-v2`
+
+- [x] Menambahkan delivery `[warm]`, `[calm]`, `[reassuring]`, dan `[persuasive]` untuk sapaan, penjelasan, kepercayaan, dan CTA affiliate.
+- [x] Mempertahankan impor paket lama `bebas-v1` sambil mengekspor paket baru dengan `expressionDialect: "bebas-v2"`.
+- [x] Memperingatkan event yang menaungi lebih dari satu kalimat dan delivery yang terlalu panjang pada preview Studio.
+- [x] Memperjelas prompt BEBAS bahwa setiap tag berlaku sampai tag berikutnya, event hanya satu frasa/kalimat pendek, dan jumlah tag mengikuti durasi serta perubahan beat.
+
+**Status dialek:** schema paket tetap versi 1 karena struktur JSON tidak berubah. Versi dialek dinaikkan agar paket dengan empat tag baru tidak disalahartikan sebagai whitelist `bebas-v1`. Instruksi kontrol sudah tersedia, sedangkan efektivitas suara setiap tag tetap harus dinilai melalui uji GPU Fase 6D.
+
 ### 6D. Validasi kualitas suara dan penyelesaian MVP
 
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
@@ -502,6 +511,7 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 23 September 2026 | Fase 6A selesai tanpa saldo: kompiler `bebas-v1` mengenali 11 tag BEBAS, membagi segmen, menerjemahkan instruksi VoxCPM, menampilkan preview, dan menahan tag mentah dari worker.                                                       | 55/55 tes Node, TypeScript, ESLint, dan build produksi lulus. Preview serta validasi tag benar/salah diperiksa di Chrome pada desktop dan viewport ponsel. Tidak ada inferensi GPU atau mutation RunPod.                                                                                                                                | Rekomendasi berikutnya tanpa saldo adalah Fase 6B: kontrak pekerjaan per segmen, orkestrasi worker palsu, penggabungan WAV, pembatalan, dan retry satu segmen. Uji dengar dan kalibrasi ekspresi tetap memerlukan GPU setelah implementasi lokal aman.                                                                             |
 | 23 September 2026 | Fase 6B selesai tanpa saldo: API dan worker memproses naskah ekspresif berurutan, menyimpan status/hasil parsial, menormalisasi dan menggabungkan WAV, serta menyediakan retry satu segmen. | 59/59 tes Node, 9/9 tes worker, TypeScript, ESLint, dan build produksi lulus. Integrasi lokal memproses tiga ekspresi dan retry melalui Web UI/API; fake runtime membuktikan gabungan WAV 0,45 detik, regenerasi hanya pada segmen pilihan, dan pemakaian ulang referensi cloning. [Application checks 35856644094](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35856644094), [Worker container 35856643979](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35856643979), dan [GPU worker image 35856643949](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35856643949) lulus. Tidak ada inferensi GPU atau mutation RunPod. | Rekomendasi berikutnya tanpa saldo adalah Fase 6C: kontrak JSON `bebas-v1` berversi dan impor dari BEBAS. Uji dengar identitas, transisi, kekuatan ekspresi, waktu, dan biaya tetap menunggu satu siklus GPU berbayar terkontrol. |
 | 23 September 2026 | Integrasi inti Fase 6C selesai tanpa saldo: BEBAS mengekspor JSON `voxcpm-studio-script` v1 dan Studio mengimpor `script` setelah memvalidasi versi, dialek, ukuran, tag, panjang, serta jumlah segmen. | 63/63 tes Node, 108/108 tes Application BEBAS, 108/108 tes Infrastructure BEBAS, 31/31 tes UI BEBAS, build Next.js, build WinUI Release x64, serta [Application checks run 35862076950](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35862076950) lulus. Payload nyata dari serializer C# berhasil dibaca parser TypeScript dengan naskah dan caption Unicode tetap utuh. Tidak ada provider AI, GPU, atau mutation RunPod yang dipanggil. | Rekomendasi berikutnya tanpa saldo adalah persiapan Fase 6D: susun korpus 20–30 naskah uji, panduan rekaman referensi, dan pemeriksaan teknis WAV. Bantuan AI ekspresi opsional tetap ditunda karena generator utama berada di BEBAS. |
+| 23 September 2026 | Fase 6C.1 selesai tanpa saldo: dialek `bebas-v2` menambah empat delivery affiliate, mempertahankan impor v1, memperingatkan segmen panjang, dan memperbaiki aturan beat generator BEBAS. | 67/67 tes Node, 108/108 tes Application BEBAS, 109/109 tes Infrastructure BEBAS, 31/31 tes UI BEBAS, TypeScript, ESLint, build Next.js, dan build WinUI Release x64 lulus. Payload `bebas-v2` nyata dari serializer C# dengan tag baru berhasil dibaca parser TypeScript. Gateway palsu membuktikan prompt baru tanpa memanggil provider AI. | Rekomendasi berikutnya tanpa saldo tetap Fase 6D: korpus 20–30 naskah, panduan rekaman referensi, dan pemeriksaan kualitas WAV. Efektivitas tag serta identitas cloning menunggu uji dengar GPU. |
 
 ## 16. Langkah pengerjaan berikutnya
 

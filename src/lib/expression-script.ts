@@ -1,4 +1,10 @@
-export const EXPRESSION_DIALECT = "bebas-v1" as const;
+export const LEGACY_EXPRESSION_DIALECT = "bebas-v1" as const;
+export const EXPRESSION_DIALECT = "bebas-v2" as const;
+export const SUPPORTED_EXPRESSION_DIALECTS = [
+  LEGACY_EXPRESSION_DIALECT,
+  EXPRESSION_DIALECT,
+] as const;
+export type ExpressionDialect = (typeof SUPPORTED_EXPRESSION_DIALECTS)[number];
 export const MAX_EXPRESSION_SEGMENTS = 50;
 
 export type ExpressionTag =
@@ -12,7 +18,11 @@ export type ExpressionTag =
   | "crying"
   | "panicked"
   | "curious"
-  | "sarcastic";
+  | "sarcastic"
+  | "warm"
+  | "calm"
+  | "reassuring"
+  | "persuasive";
 
 export interface ExpressionDefinition {
   tag: ExpressionTag;
@@ -38,6 +48,8 @@ export interface ExpressionIssue {
     | "malformed-tag"
     | "dangling-tag"
     | "duplicate-tag"
+    | "long-event-segment"
+    | "long-expression-segment"
     | "too-many-segments";
   severity: "error" | "warning";
   position: number;
@@ -46,7 +58,7 @@ export interface ExpressionIssue {
 }
 
 export interface CompiledExpressionScript {
-  dialect: typeof EXPRESSION_DIALECT;
+  dialect: ExpressionDialect;
   segments: ExpressionSegment[];
   issues: ExpressionIssue[];
   plainText: string;
@@ -154,7 +166,57 @@ export const EXPRESSION_DEFINITIONS: readonly ExpressionDefinition[] = [
     nativeToken: null,
     support: "control",
   },
+  {
+    tag: "warm",
+    label: "Hangat",
+    kind: "delivery",
+    controlInstruction:
+      "Use a warm, friendly, approachable delivery with gentle enthusiasm.",
+    nativeToken: null,
+    support: "control",
+  },
+  {
+    tag: "calm",
+    label: "Tenang",
+    kind: "delivery",
+    controlInstruction:
+      "Use a calm, steady, relaxed delivery at an unhurried natural pace.",
+    nativeToken: null,
+    support: "control",
+  },
+  {
+    tag: "reassuring",
+    label: "Meyakinkan",
+    kind: "delivery",
+    controlInstruction:
+      "Use a reassuring, trustworthy delivery with gentle confidence and clear articulation.",
+    nativeToken: null,
+    support: "control",
+  },
+  {
+    tag: "persuasive",
+    label: "Persuasif",
+    kind: "delivery",
+    controlInstruction:
+      "Use a persuasive, confident sales delivery with purposeful emphasis and a clear call to action.",
+    nativeToken: null,
+    support: "control",
+  },
 ] as const;
+
+const LEGACY_EXPRESSION_TAGS = new Set<ExpressionTag>([
+  "whispers",
+  "laughs",
+  "sighs",
+  "excited",
+  "angry",
+  "gasp",
+  "shouts",
+  "crying",
+  "panicked",
+  "curious",
+  "sarcastic",
+]);
 
 const definitionByTag = new Map(
   EXPRESSION_DEFINITIONS.map((definition) => [definition.tag, definition]),
@@ -167,6 +229,7 @@ export function expressionDefinition(tag: ExpressionTag) {
 
 export function compileExpressionScript(
   script: string,
+  dialect: ExpressionDialect = EXPRESSION_DIALECT,
 ): CompiledExpressionScript {
   const segments: ExpressionSegment[] = [];
   const issues: ExpressionIssue[] = [];
@@ -175,7 +238,7 @@ export function compileExpressionScript(
   let tagCount = 0;
   let cursor = 0;
 
-  function appendText(rawText: string) {
+  function appendText(rawText: string, sourcePosition: number) {
     const text = rawText.trim();
     if (!text) return;
     const definitions = pendingTags.map(expressionDefinition);
@@ -193,23 +256,47 @@ export function compileExpressionScript(
       targetText: [...nativeTokens, text].join(" "),
       pauseAfterMs: 0,
     });
+    const eventTags = definitions
+      .filter((definition) => definition.kind === "event")
+      .map((definition) => definition.tag);
+    const sentenceCount = text.match(/[.!?](?:[\"'”’)]|\s|$)/g)?.length ?? 0;
+    if (eventTags.length && (sentenceCount > 1 || text.length > 160)) {
+      issues.push({
+        code: "long-event-segment",
+        severity: "warning",
+        position: sourcePosition,
+        token: eventTags.map((tag) => `[${tag}]`).join(" "),
+        message: `${eventTags.map((tag) => `[${tag}]`).join(" ")} adalah event singkat. Batasi ke satu frasa atau kalimat, lalu pasang tag delivery untuk bagian berikutnya.`,
+      });
+    } else if (pendingTags.length && (sentenceCount > 2 || text.length > 300)) {
+      issues.push({
+        code: "long-expression-segment",
+        severity: "warning",
+        position: sourcePosition,
+        token: pendingTags.map((tag) => `[${tag}]`).join(" "),
+        message: "Segmen ekspresi cukup panjang. Tambahkan tag baru saat fungsi atau emosi kalimat berubah agar penyampaian tidak datar.",
+      });
+    }
     pendingTags = [];
   }
 
   for (const match of script.matchAll(bracketToken)) {
     const position = match.index ?? 0;
-    appendText(script.slice(cursor, position));
+    appendText(script.slice(cursor, position), cursor);
     matchedRanges.push([position, position + match[0].length]);
     cursor = position + match[0].length;
     const normalized = match[1].trim().toLowerCase();
     const definition = definitionByTag.get(normalized as ExpressionTag);
-    if (!definition) {
+    const supportedByDialect =
+      definition &&
+      (dialect === EXPRESSION_DIALECT || LEGACY_EXPRESSION_TAGS.has(definition.tag));
+    if (!definition || !supportedByDialect) {
       issues.push({
         code: "unknown-tag",
         severity: "error",
         position,
         token: match[0],
-        message: `Tag ${match[0]} tidak didukung oleh ${EXPRESSION_DIALECT}.`,
+        message: `Tag ${match[0]} tidak didukung oleh ${dialect}.`,
       });
       pendingTags = [];
       continue;
@@ -227,7 +314,7 @@ export function compileExpressionScript(
     }
     pendingTags.push(definition.tag);
   }
-  appendText(script.slice(cursor));
+  appendText(script.slice(cursor), cursor);
 
   if (pendingTags.length) {
     issues.push({
@@ -278,7 +365,7 @@ export function compileExpressionScript(
     (issue) => issue.code === "malformed-tag",
   );
   return {
-    dialect: EXPRESSION_DIALECT,
+    dialect,
     segments,
     issues,
     plainText,

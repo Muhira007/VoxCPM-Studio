@@ -37,7 +37,7 @@ Preflight operasi berbayar tersedia melalui `npm run runpod:preflight`. Command 
 
 | Halaman       | Perilaku saat ini                                                                                                                                                                                |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Studio        | Editor 5.000 karakter, impor JSON dari BEBAS, empat mode, gaya bicara, serta kompiler 11 tag ekspresi `bebas-v1`; pekerjaan ekspresif diproses berurutan dengan status dan retry per segmen.      |
+| Studio        | Editor 5.000 karakter, impor JSON dari BEBAS, empat mode, gaya bicara, serta kompiler 15 tag ekspresi `bebas-v2` dengan kompatibilitas `bebas-v1`; pekerjaan ekspresif diproses berurutan dengan status dan retry per segmen. |
 | Pustaka Suara | Tambah, cari, edit, hapus, dan putar rekaman referensi lokal. Tiga inspirasi karakter berisi deskripsi tanpa rekaman.                                                                            |
 | Riwayat       | Hingga 100 pekerjaan terbaru, pencarian, filter status, detail, dan penggunaan ulang naskah.                                                                                                     |
 | Sesi GPU      | Simulasi provisioning tetap lokal. Panel API menampilkan inventaris, dry-run, storage, batas biaya, idle timeout, jumlah job aktif/antri, ledger estimasi biaya, dan status kunci operasi cloud. |
@@ -52,7 +52,7 @@ Urutan mencoba:
 5. Di Pengaturan, ubah Skenario demo untuk mencoba GPU tidak tersedia, pemuatan lambat, sintesis gagal, atau koneksi terputus. Kembalikan ke Normal untuk mencoba lagi.
 6. Akhiri sesi melalui Sesi GPU. Draft dan referensi tetap tersimpan.
 
-Untuk memindahkan hasil Script Generator BEBAS, pilih **Ekspor VoxCPM JSON** di BEBAS, lalu pilih **Impor BEBAS JSON** di bawah editor Studio. Tombol ekspor saat ini tersedia pada source development BEBAS; installer BEBAS 10.1.1 dibuat lebih awal dan belum memuatnya. Importer menerima kontrak `voxcpm-studio-script` versi 1 dan memuat field `script`; field `caption` tetap merupakan caption postingan dan tidak ikut dibacakan. Spesifikasi serta contoh tersedia di [kontrak paket BEBAS v1](docs/bebas-v1-script-package.md).
+Untuk memindahkan hasil Script Generator BEBAS, pilih **Ekspor VoxCPM JSON** di BEBAS, lalu pilih **Impor BEBAS JSON** di bawah editor Studio. Tombol ekspor saat ini tersedia pada source development BEBAS; installer BEBAS 10.1.1 dibuat lebih awal dan belum memuatnya. Exporter terbaru menulis dialek `bebas-v2` dengan tambahan `[warm]`, `[calm]`, `[reassuring]`, dan `[persuasive]`; importer tetap menerima paket lama `bebas-v1`. Kontrak `voxcpm-studio-script` tetap versi 1 dan memuat field `script`; field `caption` tetap merupakan caption postingan dan tidak ikut dibacakan. Spesifikasi serta contoh tersedia di [kontrak paket BEBAS v1](docs/bebas-v1-script-package.md).
 
 ## Penyimpanan dan batas demo
 
