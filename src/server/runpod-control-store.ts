@@ -13,6 +13,7 @@ import type {
   RunpodControlSession,
   RunpodControlState,
 } from "../lib/runpod-control-types.ts";
+import { RUNPOD_ADMISSION_CUTOFF_SECONDS } from "../lib/runpod-control-types.ts";
 import { serverConfig } from "./config.ts";
 
 const FILE_LOCK_RETRY_MILLISECONDS = 25;
@@ -41,12 +42,18 @@ export function emptyRunpodControlSession(): RunpodControlSession {
     startedAt: null,
     readyAt: null,
     hardDeadline: null,
+    admissionCutoffAt: null,
     idleDeadline: null,
     idleMinutes: 10,
     runningJobCount: 0,
     queuedJobCount: 0,
     lastActivityAt: null,
     workloadSyncedAt: null,
+    drainStartedAt: null,
+    drainCompletedAt: null,
+    cancellationRequestedAt: null,
+    cancelledJobCount: 0,
+    cancellationFailureCount: 0,
     stopRequestedAt: null,
     stopConfirmedAt: null,
     stopReason: null,
@@ -80,9 +87,17 @@ function isState(value: unknown): value is RunpodControlState {
 }
 
 function normalizeState(state: RunpodControlState): RunpodControlState {
+  const session = { ...emptyRunpodControlSession(), ...state.session };
+  if (!session.admissionCutoffAt && session.hardDeadline) {
+    const hardDeadline = Date.parse(session.hardDeadline);
+    if (Number.isFinite(hardDeadline))
+      session.admissionCutoffAt = new Date(
+        hardDeadline - RUNPOD_ADMISSION_CUTOFF_SECONDS * 1_000,
+      ).toISOString();
+  }
   return {
     ...state,
-    session: { ...emptyRunpodControlSession(), ...state.session },
+    session,
     operations: state.operations.map((operation) => ({
       ...operation,
       mutationAttemptedAt: operation.mutationAttemptedAt ?? null,

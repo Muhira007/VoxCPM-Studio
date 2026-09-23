@@ -26,6 +26,7 @@ Kerangka operasi tulis sudah diimplementasikan dan diuji tanpa akun berbayar:
 - Resume hanya memakai satu Pod terkelola yang cocok dengan image immutable. Pod akun lain atau lebih dari satu Pod terkelola menghentikan operasi untuk pemeriksaan manual.
 - Stop dibedakan dari terminate. Sesi baru dianggap berhenti setelah RunPod melaporkan `EXITED` atau `TERMINATED`; respons stop yang masih aktif menghasilkan backoff dan retry terbatas.
 - Watchdog membaca state job aplikasi. Job `running` atau `queued` menghapus idle deadline; antrean kosong menetapkan deadline dari aktivitas terakhir. Hard deadline dievaluasi lebih dahulu dan tidak bergantung pada snapshot workload.
+- Admission job ditutup lima menit sebelum hard deadline. Watchdog menandai drain, meminta cancel untuk job aktif satu kali, menyimpan jumlah permintaan yang gagal, dan tetap menjalankan hard stop pada tenggat.
 - Perpanjangan 30 menit memakai operation ID, lease, dan transaksi state yang sama untuk memperbarui hard deadline. Operasi ditolak jika sesi tidak `ready`, deadline telah lewat, durasi maksimum terlampaui, atau estimasi compute melebihi hard cost limit.
 - `GET/POST /api/v1/runpod/control` dilindungi autentikasi studio dan same-origin guard. Web UI hanya menampilkan status kunci dan belum menyediakan tombol mutation.
 
@@ -71,13 +72,14 @@ Setiap operasi memakai operation/idempotency ID. Retry dengan ID sama harus memb
 
 Controller watchdog lokal memindai sesi yang belum terminal, membaca waktu server, lalu:
 
-- pada hard deadline: jalankan stop walaupun ada pekerjaan aktif atau pembacaan workload gagal;
+- lima menit sebelum hard deadline: tolak job baru, minta pembatalan job aktif satu kali, lalu pertahankan jadwal stop;
+- pada hard deadline: jalankan stop walaupun cancel worker atau pembacaan workload gagal;
 - pada idle deadline: sinkronkan job backend dan stop hanya jika antrean serta pekerjaan berjalan kosong;
 - setelah permintaan stop: poll API RunPod sampai status terverifikasi berhenti;
 - jika stop gagal: simpan error, retry terbatas dengan exponential backoff dan jitter, lalu tampilkan peringatan yang membutuhkan tindakan pengguna;
 - perpanjangan sesi: perbarui deadline serta operation ID secara atomik sebelum UI menampilkan waktu baru.
 
-Penghentian penerimaan job baru dan pembatalan job worker saat hard deadline mendekat masih harus diimplementasikan. Watchdog juga masih harus dideploy pada host cloud yang selalu aktif sebelum disebut sebagai pengaman biaya operasional.
+Admission cutoff dan pembatalan sudah diimplementasikan pada control plane lokal, tetapi belum dibuktikan terhadap worker GPU. Watchdog juga masih harus dideploy pada host cloud yang selalu aktif sebelum disebut sebagai pengaman biaya operasional.
 
 Timer habis bukan bukti biaya berhenti. Hanya status RunPod yang diverifikasi dan dicatat bersama timestamp yang menutup sesi.
 

@@ -17,9 +17,14 @@ export interface RunpodWatchdogSummary {
   phase: RunpodControlState["session"]["phase"];
   podId: string | null;
   hardDeadline: string | null;
+  admissionCutoffAt: string | null;
   idleDeadline: string | null;
   runningJobCount: number;
   queuedJobCount: number;
+  drainStartedAt: string | null;
+  drainCompletedAt: string | null;
+  cancelledJobCount: number;
+  cancellationFailureCount: number;
   retryCount: number;
   nextRetryAt: string | null;
   stopConfirmedAt: string | null;
@@ -60,9 +65,14 @@ export async function runRunpodWatchdogOnce(
     phase: after.session.phase,
     podId: after.session.podId,
     hardDeadline: after.session.hardDeadline,
+    admissionCutoffAt: after.session.admissionCutoffAt,
     idleDeadline: after.session.idleDeadline,
     runningJobCount: after.session.runningJobCount,
     queuedJobCount: after.session.queuedJobCount,
+    drainStartedAt: after.session.drainStartedAt,
+    drainCompletedAt: after.session.drainCompletedAt,
+    cancelledJobCount: after.session.cancelledJobCount,
+    cancellationFailureCount: after.session.cancellationFailureCount,
     retryCount: after.session.retryCount,
     nextRetryAt: after.session.nextRetryAt,
     stopConfirmedAt: after.session.stopConfirmedAt,

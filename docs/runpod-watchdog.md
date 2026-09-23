@@ -22,7 +22,9 @@ Exit code `0` berarti pemeriksaan selesai, termasuk ketika belum ada tindakan ya
 4. Aktivitas job terakhir, waktu mulai, dan waktu worker siap menjadi dasar idle deadline. Aktivitas baru menggeser deadline; job aktif menghapusnya.
 5. Perpanjangan sesi hanya menerima tambahan 30 menit melalui `POST /api/v1/runpod/control` dengan `Idempotency-Key`. Deadline dan catatan operasi berubah dalam satu transaksi state, lalu tetap dibatasi durasi maksimum dan hard cost limit.
 
-Pembatalan job aktif sebelum hard deadline belum dihubungkan ke worker. Controller akan tetap memilih batas biaya dan meminta stop saat hard deadline tercapai; kebijakan drain/cancel job adalah langkah berikutnya sebelum pengujian GPU nyata.
+Lima menit sebelum hard deadline, controller memasuki drain: endpoint pembuatan job menolak pekerjaan baru, job `running`/`queued` diminta batal, dan hasil cancel disimpan sebagai jumlah yang ditandai batal serta jumlah request worker yang gagal. Drain idempoten sehingga eksekusi watchdog berikutnya tidak mengirim cancel kedua. Perpanjangan ditolak setelah drain dimulai. Saat hard deadline tercapai, kegagalan cancel tidak boleh menahan stop Pod.
+
+Perilaku ini telah diuji dengan fake worker dan fake RunPod. Durasi cutoff lima menit adalah batas konservatif sebelum waktu inferensi aktual diukur pada GPU; nilainya harus dievaluasi ulang dari data Fase 6.
 
 ## Model deployment yang dipilih
 
@@ -56,6 +58,7 @@ Perintah instalasi di atas belum dijalankan. Timer baru boleh diaktifkan setelah
 - API key hanya mempunyai izin create/start/stop yang dibutuhkan; terminate tetap tidak tersedia.
 - Network Volume dan data center sudah cocok dengan GPU yang dipilih.
 - Scheduler berjalan setiap menit dan exit code nonzero menghasilkan alert.
+- Endpoint job menolak pekerjaan baru selama drain dan UI menampilkan countdown serta alasan stop.
 - Uji terkontrol membuktikan proses berhenti ketika browser serta PC pengguna mati.
 
 Deployment cloud dan verifikasi terakhir tetap menunggu saldo serta host yang dipilih.

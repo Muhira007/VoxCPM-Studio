@@ -1,5 +1,7 @@
 import type { RunpodCloud, RunpodProfileId } from "./runpod-types";
 
+export const RUNPOD_ADMISSION_CUTOFF_SECONDS = 5 * 60;
+
 export type RunpodControlPhase =
   | "off"
   | "planned"
@@ -28,12 +30,18 @@ export interface RunpodControlSession {
   startedAt: string | null;
   readyAt: string | null;
   hardDeadline: string | null;
+  admissionCutoffAt: string | null;
   idleDeadline: string | null;
   idleMinutes: number;
   runningJobCount: number;
   queuedJobCount: number;
   lastActivityAt: string | null;
   workloadSyncedAt: string | null;
+  drainStartedAt: string | null;
+  drainCompletedAt: string | null;
+  cancellationRequestedAt: string | null;
+  cancelledJobCount: number;
+  cancellationFailureCount: number;
   stopRequestedAt: string | null;
   stopConfirmedAt: string | null;
   stopReason: RunpodStopReason | null;
@@ -80,6 +88,7 @@ export interface RunpodControlStatus {
   limits: {
     maximumSessionMinutes: number;
     hardCostLimitUsd: number;
+    admissionCutoffSeconds: number;
   };
   safeguards: {
     immutableImage: boolean;
@@ -91,6 +100,7 @@ export interface RunpodControlStatus {
     reconcileBeforeCreate: true;
     hardDeadline: true;
     workloadAwareIdleDeadline: true;
+    hardDeadlineDrain: true;
     atomicDeadlineExtension: true;
     verifiedStopRequired: true;
     terminateImplemented: false;

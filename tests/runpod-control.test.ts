@@ -20,6 +20,7 @@ import { RunpodRestControlGateway } from "../src/server/runpod-control-gateway.t
 import {
   RunpodController,
   type RunpodControllerConfig,
+  type RunpodWorkloadManager,
   type RunpodWorkloadSnapshot,
 } from "../src/server/runpod-controller.ts";
 import { RunpodControlStore } from "../src/server/runpod-control-store.ts";
@@ -41,7 +42,8 @@ const config: RunpodControllerConfig = {
 };
 
 function idleWorkload(value: Partial<RunpodWorkloadSnapshot> = {}): {
-  snapshot: () => Promise<RunpodWorkloadSnapshot>;
+  snapshot: RunpodWorkloadManager["snapshot"];
+  cancelActive: RunpodWorkloadManager["cancelActive"];
 } {
   return {
     snapshot: async () => ({
@@ -50,6 +52,11 @@ function idleWorkload(value: Partial<RunpodWorkloadSnapshot> = {}): {
       lastActivityAt: null,
       idleMinutes: 10,
       ...value,
+    }),
+    cancelActive: async () => ({
+      requestedJobCount:
+        (value.runningJobCount ?? 0) + (value.queuedJobCount ?? 0),
+      failedJobCount: 0,
     }),
   };
 }
@@ -554,7 +561,13 @@ test("idle watchdog waits for running and queued jobs before stopping", async ()
       config,
       now: () => clock,
       workerProbe: async () => true,
-      workload: { snapshot: async () => structuredClone(workload) },
+      workload: {
+        snapshot: async () => structuredClone(workload),
+        cancelActive: async () => ({
+          requestedJobCount: workload.runningJobCount + workload.queuedJobCount,
+          failedJobCount: 0,
+        }),
+      },
     });
     await controller.start({
       operationId: "operation_idle_start_01",
@@ -605,6 +618,72 @@ test("idle watchdog waits for running and queued jobs before stopping", async ()
   }
 });
 
+test("admission cutoff drains active jobs once before the hard deadline", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    let clock = new Date("2026-09-21T01:00:00.000Z");
+    let cancellationCalls = 0;
+    const gateway = new FakeGateway();
+    const controller = new RunpodController({
+      store,
+      gateway,
+      catalog: { overview: async () => overview() },
+      config,
+      now: () => clock,
+      workerProbe: async () => true,
+      workload: {
+        snapshot: async () => ({
+          runningJobCount: 1,
+          queuedJobCount: 1,
+          lastActivityAt: "2026-09-21T01:24:00.000Z",
+          idleMinutes: 5,
+        }),
+        cancelActive: async () => {
+          cancellationCalls += 1;
+          return { requestedJobCount: 2, failedJobCount: 1 };
+        },
+      },
+    });
+    await controller.start({
+      operationId: "operation_drain_start_01",
+      profileId: "3090",
+      durationMinutes: 30,
+      maximumHourlyRate: 0.6,
+    });
+    gateway.pods[0].status = "RUNNING";
+    await controller.reconcile();
+    assert.equal(
+      (await store.read()).session.admissionCutoffAt,
+      "2026-09-21T01:25:00.000Z",
+    );
+
+    clock = new Date("2026-09-21T01:24:59.000Z");
+    await assert.doesNotReject(controller.assertJobAdmission());
+    clock = new Date("2026-09-21T01:25:00.000Z");
+    await Promise.all([controller.runWatchdog(), controller.runWatchdog()]);
+    const drained = await store.read();
+    assert.equal(gateway.stopCalls, 0);
+    assert.equal(cancellationCalls, 1);
+    assert.equal(drained.session.drainStartedAt, clock.toISOString());
+    assert.equal(drained.session.drainCompletedAt, clock.toISOString());
+    assert.equal(drained.session.cancelledJobCount, 2);
+    assert.equal(drained.session.cancellationFailureCount, 1);
+    await assert.rejects(controller.assertJobAdmission(), /draining/);
+
+    await controller.runWatchdog();
+    assert.equal(cancellationCalls, 1);
+    assert.equal(gateway.stopCalls, 0);
+    clock = new Date("2026-09-21T01:30:01.000Z");
+    const stopped = await controller.runWatchdog();
+    assert.equal(cancellationCalls, 1);
+    assert.equal(gateway.stopCalls, 1);
+    assert.equal(stopped.session.stopReason, "hard_deadline");
+    assert.equal(stopped.session.phase, "stopped");
+  } finally {
+    await removeTemporary(directory);
+  }
+});
+
 test("hard deadline stops a session even while a job is running", async () => {
   const { directory, store } = await temporaryStore();
   try {
@@ -635,7 +714,8 @@ test("hard deadline stops a session even while a job is running", async () => {
     const stopped = await controller.runWatchdog();
     assert.equal(gateway.stopCalls, 1);
     assert.equal(stopped.session.phase, "stopped");
-    assert.equal(stopped.session.runningJobCount, 1);
+    assert.equal(stopped.session.runningJobCount, 0);
+    assert.equal(stopped.session.cancelledJobCount, 1);
     assert.equal(stopped.session.stopReason, "hard_deadline");
   } finally {
     await removeTemporary(directory);
@@ -657,6 +737,10 @@ test("hard deadline does not depend on the workload snapshot", async () => {
         snapshot: async () => {
           throw new Error("workload unavailable");
         },
+        cancelActive: async () => ({
+          requestedJobCount: 0,
+          failedJobCount: 0,
+        }),
       },
     });
     await controller.start({
@@ -704,6 +788,7 @@ test("deadline extension is atomic, idempotent, and bounded by hard cost", async
     };
     const first = await controller.extend(firstInput);
     assert.equal(first.session.hardDeadline, "2026-09-21T02:30:00.000Z");
+    assert.equal(first.session.admissionCutoffAt, "2026-09-21T02:25:00.000Z");
     const repeated = await controller.extend(firstInput);
     assert.equal(repeated.session.hardDeadline, first.session.hardDeadline);
     assert.equal(

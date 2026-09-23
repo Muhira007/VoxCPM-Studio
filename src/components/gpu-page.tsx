@@ -38,6 +38,24 @@ const AVAILABILITY_LABELS = {
   UNKNOWN: "Tidak diketahui",
 };
 
+const RUNPOD_PHASE_LABELS: Record<RunpodControlStatus["phase"], string> = {
+  off: "Belum ada sesi cloud",
+  planned: "Pembuatan direncanakan",
+  provisioning: "Pod sedang dibuat",
+  starting: "Pod sedang dimulai",
+  loading_model: "Model sedang dimuat",
+  ready: "Worker cloud siap",
+  stopping: "Stop sedang diverifikasi",
+  stopped: "Pod sudah berhenti",
+  error: "Kontrol perlu diperiksa",
+};
+
+const RUNPOD_STOP_LABELS = {
+  manual: "Stop manual",
+  hard_deadline: "Hard deadline",
+  idle_deadline: "Idle timeout",
+};
+
 async function responseMessage(response: Response, fallback: string) {
   const payload = (await response.json().catch(() => null)) as {
     message?: string;
@@ -79,6 +97,16 @@ export function GpuPage() {
         );
   const remaining =
     session.expiresAt === null ? 0 : (session.expiresAt - state.now) / 1000;
+  const runpodHardRemaining = runpodControl?.session.hardDeadline
+    ? (Date.parse(runpodControl.session.hardDeadline) - state.now) / 1000
+    : null;
+  const runpodIdleRemaining = runpodControl?.session.idleDeadline
+    ? (Date.parse(runpodControl.session.idleDeadline) - state.now) / 1000
+    : null;
+  const runpodActiveJobs = runpodControl
+    ? runpodControl.session.runningJobCount +
+      runpodControl.session.queuedJobCount
+    : 0;
 
   useEffect(() => {
     if (service.mode !== "api") return;
@@ -120,6 +148,43 @@ export function GpuPage() {
       });
     return () => controller.abort();
   }, [refreshVersion, service.mode]);
+
+  useEffect(() => {
+    if (service.mode !== "api") return;
+    const controller = new AbortController();
+    const interval = window.setInterval(() => {
+      void fetch("/api/v1/runpod/control", {
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok)
+            throw new Error(
+              await responseMessage(
+                response,
+                "Status kontrol RunPod tidak dapat dimuat.",
+              ),
+            );
+          const payload = (await response.json()) as {
+            control: RunpodControlStatus;
+          };
+          setRunpodControl(payload.control);
+        })
+        .catch((problem) => {
+          if (!controller.signal.aborted)
+            setRunpodError(
+              problem instanceof Error
+                ? problem.message
+                : "Status kontrol RunPod tidak dapat dimuat.",
+            );
+        });
+    }, 10_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [service.mode]);
 
   useEffect(() => {
     if (service.mode !== "api" || !runpodOverview) return;
@@ -322,28 +387,52 @@ export function GpuPage() {
                       </small>
                     </div>
                     <div>
-                      <span>Batas keras</span>
+                      <span>Batas & drain</span>
                       <strong>
                         {runpodControl.limits.maximumSessionMinutes} menit · $
                         {runpodControl.limits.hardCostLimitUsd.toFixed(2)}
                       </strong>
                       <small>
-                        Idle {runpodControl.session.idleMinutes} menit ·{" "}
-                        {runpodControl.session.runningJobCount +
-                          runpodControl.session.queuedJobCount}{" "}
-                        job aktif/antri
+                        Tolak job baru{" "}
+                        {formatTime(
+                          runpodControl.limits.admissionCutoffSeconds,
+                        )}{" "}
+                        sebelum tenggat
                       </small>
                     </div>
                     <div>
-                      <span>Prasyarat tersisa</span>
+                      <span>Countdown cloud</span>
                       <strong>
-                        {runpodControl.storage.volumeConfigured &&
-                        runpodControl.storage.dataCenterConfigured
-                          ? "Volume dan lokasi siap"
-                          : "Volume / lokasi belum diisi"}
+                        Hard{" "}
+                        {runpodHardRemaining === null
+                          ? "—"
+                          : formatTime(runpodHardRemaining)}
                       </strong>
                       <small>
-                        Command watchdog siap · cloud belum dideploy
+                        Idle{" "}
+                        {runpodIdleRemaining !== null
+                          ? formatTime(runpodIdleRemaining)
+                          : runpodActiveJobs > 0
+                            ? `ditahan ${runpodActiveJobs} job`
+                            : "—"}
+                      </small>
+                    </div>
+                    <div>
+                      <span>Status kontrol</span>
+                      <strong>
+                        {runpodControl.session.stopReason
+                          ? RUNPOD_STOP_LABELS[runpodControl.session.stopReason]
+                          : runpodControl.session.drainStartedAt
+                            ? "Drain hard deadline"
+                            : RUNPOD_PHASE_LABELS[runpodControl.phase]}
+                      </strong>
+                      <small>
+                        {runpodControl.session.drainStartedAt
+                          ? `${runpodControl.session.cancelledJobCount} ditandai batal · ${runpodControl.session.cancellationFailureCount} worker gagal`
+                          : runpodControl.storage.volumeConfigured &&
+                              runpodControl.storage.dataCenterConfigured
+                            ? "Volume dan lokasi siap"
+                            : "Volume / lokasi belum diisi"}
                       </small>
                     </div>
                   </div>

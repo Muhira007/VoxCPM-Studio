@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
-Terakhir diperbarui: 21 September 2026
-Status: **Fase 0–4C, integrasi baca saja, control plane, paket watchdog, dan pengaman deadline lokal Fase 5 selesai; resource GPU menunggu saldo serta volume/data center aktual.**
-Fase aktif: **Fase 5.2B — idle shutdown berbasis job dan perpanjangan deadline sudah siap secara lokal; drain/cancel job pada hard deadline serta deployment cloud belum dikerjakan.**
+Terakhir diperbarui: 23 September 2026
+Status: **Fase 0–4C, integrasi baca saja, control plane, paket watchdog, serta admission/drain deadline lokal Fase 5 selesai; resource GPU menunggu saldo serta volume/data center aktual.**
+Fase aktif: **Fase 5.2C — admission cutoff, drain/cancel, countdown, dan alasan stop sudah siap secara lokal; rincian estimasi biaya serta deployment cloud belum dikerjakan.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -315,7 +315,8 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - [x] Mengimplementasikan idle shutdown pada controller lokal hanya ketika job `running` dan `queued` kosong; aktivitas terakhir menentukan idle deadline.
 - [ ] Memverifikasi idle shutdown dengan worker dan scheduler cloud sebenarnya.
 - [x] Mengimplementasikan deadline absolut, batas sesi maksimum 240 menit, dan hard cost limit default `$1.00` pada controller lokal.
-- [ ] Menetapkan perilaku pekerjaan aktif ketika tenggat mendekat dan membuktikannya pada worker GPU.
+- [x] Menutup admission lima menit sebelum hard deadline, meminta pembatalan job aktif satu kali, dan memastikan kegagalan cancel tidak menahan hard stop pada controller lokal.
+- [ ] Membuktikan admission cutoff dan pembatalan terhadap worker GPU nyata.
 - [x] Membuat perpanjangan 30 menit atomik dan idempoten pada state kontrol, dengan batas durasi maksimum serta hard cost limit.
 - [ ] Menghubungkan kontrol perpanjangan ke alur sesi GPU nyata dan memverifikasi tenggat pada deployment cloud.
 - [x] Mendeteksi kegagalan API stop, menyimpan error, dan menguji maksimal tiga kegagalan dengan exponential backoff pada fake RunPod.
@@ -357,6 +358,14 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 - Perpanjangan 30 menit memakai lease, operation ID idempoten, serta satu transaksi untuk deadline dan catatan operasi. Perpanjangan melewati 240 menit atau hard cost limit ditolak tanpa mengubah deadline.
 - Panel Sesi GPU menampilkan idle timeout serta jumlah job aktif/antri. Tombol mutation cloud tetap belum ditampilkan.
 - Seluruh skenario memakai fake RunPod dan state job lokal. Tidak ada Pod, volume, data center, izin key, atau mutation nyata yang dibuat.
+
+**Hasil Fase 5.2B tanpa saldo, 23 September 2026:**
+
+- Setiap sesi menyimpan `admissionCutoffAt` lima menit sebelum hard deadline. Endpoint job baru menolak pekerjaan setelah cutoff atau drain dimulai; retry idempoten tetap dapat membaca job yang sudah ada.
+- Watchdog meminta pembatalan job `running`/`queued` satu kali, mencatat waktu drain, jumlah job yang ditandai batal, serta jumlah request cancel worker yang gagal.
+- Kegagalan cancel worker tidak menahan hard stop. Perpanjangan sesi ditolak setelah drain dimulai agar job yang sudah dibatalkan tidak seolah-olah aktif kembali.
+- Panel RunPod memuat ulang status kontrol setiap sepuluh detik serta menampilkan countdown hard/idle deadline, status drain, jumlah pembatalan, dan alasan stop.
+- Seluruh verifikasi memakai fake worker/RunPod. `RUNPOD_WRITE_ENABLED=false`; tidak ada resource atau mutation cloud yang dibuat.
 
 ## 12. Fase 6 — Validasi kualitas suara dan penyelesaian MVP
 
@@ -427,10 +436,11 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 21 September 2026 | Fase 5.1A selesai tanpa saldo: strategi Standard Network Volume 30 GB dipilih; gateway dan state machine create/resume/stop dibuat di balik feature flag nonaktif.                                                            | 36/36 tes Node membuktikan lock sebelum jaringan, payload mount, idempotency, timeout create ambigu, lease persisten, rekonsiliasi, batas biaya, deadline, backoff, dan stop terminal. TypeScript, ESLint, build produksi, serta [Application checks run 35606701728](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35606701728) lulus; akun tetap 0 Pod dan tidak ada mutation nyata. | Volume/data center aktual, izin tulis, scheduler cloud, dan siklus GPU tetap menunggu. Rekomendasi berikutnya tanpa saldo adalah mengemas watchdog sebagai command scheduler-ready serta menetapkan single-writer deployment atau datastore dengan compare-and-swap; saldo diperlukan saat membuat Network Volume atau Pod pertama. |
 | 21 September 2026 | Fase 5.1B selesai tanpa saldo: watchdog dikemas sebagai command scheduler, state memakai mutex lintas proses, dan deployment awal ditetapkan satu replica.                                                                    | 39/39 tes Node lulus, termasuk 12 writer paralel, stale-lock recovery, serta restart/adopsi setelah create timeout; command aktual menghasilkan `skipped_writes_disabled` dan [Application checks run 35607738290](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35607738290) sukses.                                                                                                  | Scheduler belum dideploy dan idle shutdown belum terhubung ke aktivitas job. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2A: state pekerjaan aktif, idle deadline, dan perpanjangan deadline dengan fake worker/RunPod.                                                                                                        |
 | 21 September 2026 | Fase 5.2A selesai tanpa saldo: watchdog terhubung ke state job, idle shutdown menunggu antrean kosong, hard deadline tetap dominan, dan perpanjangan deadline dibuat atomik/idempoten.                                        | 43/43 tes Node lulus, termasuk workload gagal pada hard deadline, job running/queued, idle stop, batas biaya, dan retry perpanjangan tanpa duplikasi. TypeScript, ESLint, build produksi, serta [Application checks run 35609279751](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35609279751) lulus; tidak ada mutation RunPod nyata.                                                | Scheduler serta siklus GPU nyata tetap menunggu saldo/host. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2B: admission cutoff, drain/cancel job aktif menjelang hard deadline, serta countdown dan alasan stop pada UI.                                                                                                         |
+| 23 September 2026 | Fase 5.2B selesai tanpa saldo: admission ditutup lima menit sebelum hard deadline, drain membatalkan job aktif secara idempoten, dan UI menampilkan countdown serta alasan stop.                                              | 44/44 tes Node dan 7/7 tes worker lulus secara lokal, termasuk drain satu kali, kegagalan cancel worker, penolakan admission, dan hard stop yang tetap dominan. TypeScript, ESLint, build produksi, serta UI ponsel lulus; tidak ada mutation RunPod nyata.                                                                                                                                      | Cutoff belum dikalibrasi dengan durasi inferensi GPU. Rekomendasi berikutnya tanpa saldo adalah Fase 5.2C: ledger estimasi compute startup/running/idle, exposure sampai hard deadline, dan biaya storage terpisah di UI.                                                                                                           |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi selama saldo RunPod masih $0,00:** kerjakan Fase 5.2B dengan menolak job baru ketika sisa hard deadline tidak cukup, melakukan drain atau pembatalan job aktif secara tercatat, serta menampilkan countdown hard/idle deadline dan alasan stop di UI. Kebijakan ini dapat diuji dengan fake worker dan fake RunPod sebelum resource berbayar dibuat.
+**Rekomendasi selama saldo RunPod masih $0,00:** kerjakan Fase 5.2C dengan membuat ledger estimasi biaya dari timestamp control plane: pisahkan startup/loading, running/idle, exposure maksimum sampai hard deadline, dan storage bulanan di UI. Angka harus diberi label estimasi sampai dibandingkan dengan tagihan satu siklus GPU nyata.
 
 Sesudah saldo tersedia, buat Network Volume 30 GB pada data center yang mendukung GPU terpilih, baca ulang harga dan ketersediaan, konfirmasi batas `$1.00` serta durasi uji, lalu naikkan izin key hanya untuk create/start/stop. Resource pertama harus dibatasi untuk satu siklus deploy → readiness → sintesis pendek → simpan hasil → penghentian terverifikasi.
 

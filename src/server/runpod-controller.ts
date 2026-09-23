@@ -7,6 +7,7 @@ import type {
   RunpodOperationKind,
   RunpodStopReason,
 } from "../lib/runpod-control-types.ts";
+import { RUNPOD_ADMISSION_CUTOFF_SECONDS } from "../lib/runpod-control-types.ts";
 import type {
   RunpodCloud,
   RunpodOverview,
@@ -26,6 +27,7 @@ import {
   runpodControlStore,
 } from "./runpod-control-store.ts";
 import { appStore } from "./store.ts";
+import { cancelWorkerJob } from "./worker-client.ts";
 
 const MANAGED_POD_PREFIX = "voxcpm-studio-";
 const MAX_STOP_FAILURES = 3;
@@ -74,8 +76,14 @@ export interface RunpodWorkloadSnapshot {
   idleMinutes: number;
 }
 
-export interface RunpodWorkloadReader {
+export interface RunpodCancellationSummary {
+  requestedJobCount: number;
+  failedJobCount: number;
+}
+
+export interface RunpodWorkloadManager {
   snapshot(): Promise<RunpodWorkloadSnapshot>;
+  cancelActive(reason: string): Promise<RunpodCancellationSummary>;
 }
 
 interface CatalogReader {
@@ -89,10 +97,10 @@ interface RunpodControllerDependencies {
   config?: RunpodControllerConfig;
   now?: () => Date;
   workerProbe?: (podId: string) => Promise<boolean>;
-  workload?: RunpodWorkloadReader;
+  workload?: RunpodWorkloadManager;
 }
 
-const appStoreWorkloadReader: RunpodWorkloadReader = {
+const appStoreWorkloadManager: RunpodWorkloadManager = {
   async snapshot() {
     const state = await appStore.read();
     const timestamps = state.jobs
@@ -107,6 +115,35 @@ const appStoreWorkloadReader: RunpodWorkloadReader = {
         ? new Date(Math.max(...timestamps)).toISOString()
         : null,
       idleMinutes: state.settings.idleMinutes,
+    };
+  },
+  async cancelActive(reason) {
+    const state = await appStore.read();
+    const active = state.jobs.filter(
+      (job) => job.status === "running" || job.status === "queued",
+    );
+    const results = await Promise.allSettled(
+      active.map((job) => cancelWorkerJob(job.id)),
+    );
+    const timestamp = new Date().toISOString();
+    const activeIds = new Set(active.map((job) => job.id));
+    await appStore.mutate((current) => {
+      current.jobs = current.jobs.map((job) =>
+        activeIds.has(job.id) &&
+        (job.status === "running" || job.status === "queued")
+          ? {
+              ...job,
+              status: "cancelled",
+              updatedAt: timestamp,
+              message: reason,
+            }
+          : job,
+      );
+    });
+    return {
+      requestedJobCount: active.length,
+      failedJobCount: results.filter((result) => result.status === "rejected")
+        .length,
     };
   },
 };
@@ -152,6 +189,12 @@ function infrastructurePhase(pod: ManagedRunpodPod): RunpodControlPhase {
   return "error";
 }
 
+function admissionCutoff(deadline: number): string {
+  return new Date(
+    deadline - RUNPOD_ADMISSION_CUTOFF_SECONDS * 1_000,
+  ).toISOString();
+}
+
 function upsertOperation(
   state: RunpodControlState,
   operation: RunpodControlOperation,
@@ -188,7 +231,7 @@ export class RunpodController {
   private readonly config: RunpodControllerConfig;
   private readonly now: () => Date;
   private readonly workerProbe: (podId: string) => Promise<boolean>;
-  private readonly workload: RunpodWorkloadReader;
+  private readonly workload: RunpodWorkloadManager;
 
   constructor(dependencies: RunpodControllerDependencies = {}) {
     this.store = dependencies.store ?? runpodControlStore;
@@ -197,7 +240,7 @@ export class RunpodController {
     this.config = dependencies.config ?? defaultConfig();
     this.now = dependencies.now ?? (() => new Date());
     this.workerProbe = dependencies.workerProbe ?? defaultWorkerProbe;
-    this.workload = dependencies.workload ?? appStoreWorkloadReader;
+    this.workload = dependencies.workload ?? appStoreWorkloadManager;
   }
 
   private writeConfigurationErrors(): string[] {
@@ -264,6 +307,7 @@ export class RunpodController {
         hardCostLimitUsd: Number.isFinite(this.config.hardCostLimitUsd)
           ? this.config.hardCostLimitUsd
           : 1,
+        admissionCutoffSeconds: RUNPOD_ADMISSION_CUTOFF_SECONDS,
       },
       safeguards: {
         immutableImage: /@sha256:[a-f0-9]{64}$/.test(this.config.workerImage),
@@ -275,6 +319,7 @@ export class RunpodController {
         reconcileBeforeCreate: true,
         hardDeadline: true,
         workloadAwareIdleDeadline: true,
+        hardDeadlineDrain: true,
         atomicDeadlineExtension: true,
         verifiedStopRequired: true,
         terminateImplemented: false,
@@ -282,6 +327,25 @@ export class RunpodController {
       },
       blockers,
     };
+  }
+
+  async assertJobAdmission(): Promise<void> {
+    if (!this.config.writeEnabled) return;
+    const state = await this.store.read();
+    if (state.session.phase !== "ready")
+      throw new ApiError(409, "The RunPod worker is not ready for a new job.");
+    const cutoff = state.session.admissionCutoffAt
+      ? Date.parse(state.session.admissionCutoffAt)
+      : Number.NaN;
+    if (
+      state.session.drainStartedAt ||
+      !Number.isFinite(cutoff) ||
+      cutoff <= this.now().getTime()
+    )
+      throw new ApiError(
+        409,
+        "The RunPod session is draining before its hard deadline and cannot accept a new job.",
+      );
   }
 
   private async acquireLease(owner: string) {
@@ -425,6 +489,7 @@ export class RunpodController {
         initial.session.phase !== "ready" ||
         !initial.session.startedAt ||
         !initial.session.hardDeadline ||
+        initial.session.drainStartedAt ||
         initial.session.hourlyRate === null
       )
         throw new ApiError(409, "No ready RunPod session can be extended.");
@@ -454,6 +519,7 @@ export class RunpodController {
       const timestamp = this.now().toISOString();
       await this.store.mutate((state) => {
         state.session.hardDeadline = new Date(nextDeadline).toISOString();
+        state.session.admissionCutoffAt = admissionCutoff(nextDeadline);
         upsertOperation(state, {
           id: input.operationId,
           kind: "extend",
@@ -554,6 +620,7 @@ export class RunpodController {
         );
 
       const now = this.now();
+      const hardDeadline = now.getTime() + input.durationMinutes * 60_000;
       const podName = pod?.name ?? `${MANAGED_POD_PREFIX}${hash.slice(0, 12)}`;
       const operation: RunpodControlOperation = {
         id: input.operationId,
@@ -579,9 +646,8 @@ export class RunpodController {
           networkVolumeId: this.config.networkVolumeId,
           hourlyRate: offer.hourlyRate,
           startedAt: now.toISOString(),
-          hardDeadline: new Date(
-            now.getTime() + input.durationMinutes * 60_000,
-          ).toISOString(),
+          hardDeadline: new Date(hardDeadline).toISOString(),
+          admissionCutoffAt: admissionCutoff(hardDeadline),
           message: pod
             ? "Existing managed RunPod Pod was reconciled."
             : "RunPod Pod creation is planned.",
@@ -866,6 +932,53 @@ export class RunpodController {
     });
   }
 
+  private async beginHardDeadlineDrain(): Promise<RunpodControlState> {
+    const attemptTime = this.now();
+    const timestamp = attemptTime.toISOString();
+    const claimed = await this.store.mutate((state) => {
+      if (state.session.drainCompletedAt) return false;
+      const previousAttempt = state.session.cancellationRequestedAt
+        ? Date.parse(state.session.cancellationRequestedAt)
+        : Number.NaN;
+      if (
+        Number.isFinite(previousAttempt) &&
+        attemptTime.getTime() - previousAttempt < LEASE_MILLISECONDS
+      )
+        return false;
+      state.session.drainStartedAt ??= timestamp;
+      state.session.cancellationRequestedAt = timestamp;
+      state.session.idleDeadline = null;
+      state.session.message =
+        "RunPod hard deadline is approaching; new jobs are blocked and active jobs are being cancelled.";
+      return true;
+    });
+    if (!claimed) return await this.store.read();
+    let summary: RunpodCancellationSummary;
+    try {
+      summary = await this.workload.cancelActive(
+        "Cancelled because the RunPod hard deadline is approaching.",
+      );
+    } catch {
+      const state = await this.store.read();
+      const active =
+        state.session.runningJobCount + state.session.queuedJobCount;
+      summary = { requestedJobCount: active, failedJobCount: active };
+    }
+    const completedAt = this.now().toISOString();
+    await this.store.mutate((state) => {
+      state.session.drainCompletedAt = completedAt;
+      state.session.cancelledJobCount = summary.requestedJobCount;
+      state.session.cancellationFailureCount = summary.failedJobCount;
+      state.session.runningJobCount = 0;
+      state.session.queuedJobCount = 0;
+      if (!["stopping", "stopped"].includes(state.session.phase))
+        state.session.message = summary.failedJobCount
+          ? `RunPod drain requested cancellation for ${summary.requestedJobCount} job(s); ${summary.failedJobCount} worker cancellation request(s) failed and hard stop remains scheduled.`
+          : `RunPod drain completed; ${summary.requestedJobCount} active job(s) were cancelled before the hard deadline.`;
+    });
+    return await this.store.read();
+  }
+
   async runWatchdog(): Promise<RunpodControlState> {
     let state = await this.store.read();
     if (!this.config.writeEnabled) return state;
@@ -879,6 +992,9 @@ export class RunpodController {
     const hardDeadlineReached =
       state.session.hardDeadline !== null &&
       Date.parse(state.session.hardDeadline) <= now;
+    const admissionCutoffReached =
+      state.session.admissionCutoffAt !== null &&
+      Date.parse(state.session.admissionCutoffAt) <= now;
     const retryDue =
       state.session.nextRetryAt !== null &&
       Date.parse(state.session.nextRetryAt) <= now;
@@ -886,8 +1002,12 @@ export class RunpodController {
     let reason: RunpodStopReason;
     if (state.session.retryCount > 0)
       reason = state.session.stopReason ?? "hard_deadline";
-    else if (hardDeadlineReached) reason = "hard_deadline";
-    else {
+    else if (hardDeadlineReached) {
+      state = await this.beginHardDeadlineDrain();
+      reason = "hard_deadline";
+    } else if (admissionCutoffReached || state.session.drainStartedAt) {
+      return await this.beginHardDeadlineDrain();
+    } else {
       state = await this.syncWorkload();
       const idleDeadlineReached =
         state.session.idleDeadline !== null &&
