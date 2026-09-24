@@ -29,4 +29,6 @@ Lima MP3 dari folder sampel lokal yang diberikan pengguna dibaca tanpa menyalin 
 | Sample Audio 4 | 52,66 dtk | −18,9 dBFS | −1,8 dBFS | Durasi dan level sesuai target; WAV mono tetap disarankan. |
 | Sample Audio 5 | 112,82 dtk | −22,0 dBFS | −0,5 dBFS | Terlalu panjang untuk target dan puncak dekat batas digital. |
 
+`Sample Audio 2` diekspor sebagai `Sample Audio 2 - VoxCPM.wav` di folder lokal yang sama menggunakan PCM 16-bit, mono, 24 kHz, tanpa normalisasi. Hasil 41,12 detik tersebut lulus seluruh pemeriksaan lokal dan disimpan sebagai **Suara Saya — Referensi Utama** di Pustaka Suara browser. Konversi ini tidak mengembalikan detail yang sudah hilang pada MP3; rekaman WAV langsung tetap menjadi peningkatan berikutnya bila kualitas cloning belum memadai.
+
 Pemeriksaan ini tidak menilai noise latar secara subjektif, kemiripan cloning, atau ketepatan transkrip karena belum menjalankan inferensi maupun uji dengar terstruktur.

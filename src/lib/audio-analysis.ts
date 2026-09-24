@@ -37,7 +37,10 @@ export interface AudioQualityReport {
 
 export interface PcmAudioInput {
   channelData: readonly Float32Array[];
+  /** Sample rate of channelData after decoding. */
   sampleRate: number;
+  /** Original file sample rate when it can be read without decoder resampling. */
+  sourceSampleRate?: number;
   format: string;
   bitDepth?: number | null;
   analyzedAt?: number;
@@ -68,6 +71,9 @@ function overallStatus(findings: readonly AudioQualityFinding[]): AudioQualitySt
 export function analyzePcmAudio(input: PcmAudioInput): AudioQualityReport {
   if (!Number.isFinite(input.sampleRate) || input.sampleRate <= 0)
     throw new Error("Sample rate audio tidak valid.");
+  const sourceSampleRate = input.sourceSampleRate ?? input.sampleRate;
+  if (!Number.isFinite(sourceSampleRate) || sourceSampleRate <= 0)
+    throw new Error("Sample rate sumber audio tidak valid.");
   if (!input.channelData.length || input.channelData.length > 8)
     throw new Error("Jumlah channel audio tidak valid.");
   const frameCount = Math.min(...input.channelData.map((channel) => channel.length));
@@ -139,9 +145,9 @@ export function analyzePcmAudio(input: PcmAudioInput): AudioQualityReport {
         : finding("duration", "pass", "Durasi", "Durasi berada dalam target 15–60 detik."),
   );
   findings.push(
-    input.sampleRate < 16_000
+    sourceSampleRate < 16_000
       ? finding("sample-rate", "fail", "Sample rate", "Gunakan sample rate minimal 16 kHz.")
-      : input.sampleRate < 24_000
+      : sourceSampleRate < 24_000
         ? finding(
             "sample-rate",
             "warning",
@@ -203,7 +209,7 @@ export function analyzePcmAudio(input: PcmAudioInput): AudioQualityReport {
     version: AUDIO_ANALYSIS_VERSION,
     format,
     durationSeconds,
-    sampleRate: input.sampleRate,
+    sampleRate: sourceSampleRate,
     channels,
     bitDepth: input.bitDepth ?? null,
     peakDbfs,
@@ -217,7 +223,12 @@ export function analyzePcmAudio(input: PcmAudioInput): AudioQualityReport {
   };
 }
 
-function wavBitDepth(buffer: ArrayBuffer): number | null {
+export interface WavMetadata {
+  sampleRate: number;
+  bitDepth: number;
+}
+
+export function parseWavMetadata(buffer: ArrayBuffer): WavMetadata | null {
   if (buffer.byteLength < 44) return null;
   const view = new DataView(buffer);
   const ascii = (offset: number, length: number) =>
@@ -227,8 +238,11 @@ function wavBitDepth(buffer: ArrayBuffer): number | null {
   while (offset + 8 <= buffer.byteLength) {
     const chunk = ascii(offset, 4);
     const size = view.getUint32(offset + 4, true);
-    if (chunk === "fmt " && size >= 16 && offset + 8 + size <= buffer.byteLength)
-      return view.getUint16(offset + 8 + 14, true);
+    if (chunk === "fmt " && size >= 16 && offset + 8 + size <= buffer.byteLength) {
+      const sampleRate = view.getUint32(offset + 8 + 4, true);
+      const bitDepth = view.getUint16(offset + 8 + 14, true);
+      return sampleRate > 0 && bitDepth > 0 ? { sampleRate, bitDepth } : null;
+    }
     offset += 8 + size + (size % 2);
   }
   return null;
@@ -241,6 +255,7 @@ export async function inspectReferenceAudio(file: File): Promise<AudioQualityRep
     throw new Error("Ukuran berkas harus lebih dari 0 dan maksimal 20 MB.");
   const extension = file.name.split(".").at(-1)?.toUpperCase() ?? "AUDIO";
   const bytes = await file.arrayBuffer();
+  const wav = extension === "WAV" ? parseWavMetadata(bytes) : null;
   const contextClass = (
     globalThis as typeof globalThis & {
       webkitAudioContext?: typeof AudioContext;
@@ -261,8 +276,9 @@ export async function inspectReferenceAudio(file: File): Promise<AudioQualityRep
         decoded.getChannelData(index),
       ),
       sampleRate: decoded.sampleRate,
+      sourceSampleRate: wav?.sampleRate,
       format: extension,
-      bitDepth: extension === "WAV" ? wavBitDepth(bytes) : null,
+      bitDepth: wav?.bitDepth ?? null,
     });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Pilih audio")) throw error;

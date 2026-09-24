@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   analyzePcmAudio,
   isAudioQualityReport,
+  parseWavMetadata,
 } from "../src/lib/audio-analysis.ts";
 import { compileExpressionScript } from "../src/lib/expression-script.ts";
 
@@ -12,6 +13,29 @@ function tone(seconds: number, sampleRate: number, amplitude: number) {
   for (let index = 0; index < data.length; index += 1)
     data[index] = Math.sin((2 * Math.PI * 220 * index) / sampleRate) * amplitude;
   return data;
+}
+
+function wavHeader(sampleRate: number, bitDepth: number) {
+  const buffer = new ArrayBuffer(44);
+  const view = new DataView(buffer);
+  const write = (offset: number, value: string) =>
+    [...value].forEach((character, index) =>
+      view.setUint8(offset + index, character.charCodeAt(0)),
+    );
+  write(0, "RIFF");
+  view.setUint32(4, 36, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * (bitDepth / 8), true);
+  view.setUint16(32, bitDepth / 8, true);
+  view.setUint16(34, bitDepth, true);
+  write(36, "data");
+  view.setUint32(40, 0, true);
+  return buffer;
 }
 
 test("clean mono WAV passes all local reference checks", () => {
@@ -55,6 +79,28 @@ test("compressed stereo and hot peaks produce actionable warnings", () => {
     report.findings.find((item) => item.code === "clipping")?.status,
     "warning",
   );
+});
+
+test("source sample rate remains accurate after browser decoder resampling", () => {
+  const report = analyzePcmAudio({
+    channelData: [tone(20, 48_000, 0.3)],
+    sampleRate: 48_000,
+    sourceSampleRate: 24_000,
+    format: "wav",
+    bitDepth: 16,
+  });
+
+  assert.equal(report.durationSeconds, 20);
+  assert.equal(report.sampleRate, 24_000);
+  assert.equal(report.status, "pass");
+});
+
+test("WAV metadata parser reads the original sample rate and bit depth", () => {
+  assert.deepEqual(parseWavMetadata(wavHeader(24_000, 16)), {
+    sampleRate: 24_000,
+    bitDepth: 16,
+  });
+  assert.equal(parseWavMetadata(new ArrayBuffer(44)), null);
 });
 
 test("short low-rate clipped audio fails readiness", () => {
