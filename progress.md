@@ -1,8 +1,8 @@
 # Progress — VoxCPM Studio
 
-Terakhir diperbarui: 23 September 2026
-Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, preflight operasi berbayar lokal Fase 5, serta implementasi ekspresi dan integrasi BEBAS sampai dialek affiliate `bebas-v2` selesai; resource GPU menunggu saldo, host selalu aktif, dan volume/data center aktual.**
-Fase aktif: **Persiapan Fase 6D tanpa saldo — menyusun korpus uji Indonesia, panduan rekaman referensi, dan pemeriksaan teknis WAV sebelum validasi suara pada GPU.**
+Terakhir diperbarui: 24 September 2026
+Status: **Fase 0–4C, integrasi baca saja, control plane, watchdog, pengaman biaya, preflight operasi berbayar lokal Fase 5, implementasi ekspresi dan integrasi BEBAS sampai dialek affiliate `bebas-v2`, serta kesiapan lokal Fase 6D selesai; validasi suara aktual menunggu resource GPU, saldo, host selalu aktif, dan volume/data center aktual.**
+Fase aktif: **Fase 6D — kesiapan lokal referensi, korpus, dan rubrik selesai; validasi kemiripan, ekspresi, transisi, waktu, serta biaya menunggu inferensi GPU.**
 
 ## 1. Tujuan dan batas pekerjaan saat ini
 
@@ -440,8 +440,10 @@ Membangun aplikasi pribadi untuk TTS Bahasa Indonesia, voice cloning, dan voice 
 
 - [ ] Memverifikasi ulang API serta kemampuan versi VoxCPM2 yang dipasang menggunakan repo upstream.
 - [ ] Menguji TTS Indonesia, voice design, cloning dengan gaya, dan Hi-Fi cloning secara terpisah.
-- [ ] Menyiapkan 20–30 naskah uji: narasi, dialog, rupiah, tanggal, singkatan, nama, dan campuran Indonesia–Inggris.
-- [ ] Menguji referensi audio bersih dan transkrip yang sesuai; menyediakan panduan input di UI.
+- [x] Menyiapkan 24 naskah uji berversi: narasi, affiliate, event, rupiah, tanggal, singkatan, nama, satuan, prosodi, identitas, dan campuran Indonesia–Inggris.
+- [x] Menyediakan panduan input di UI, contoh teks rekaman, pemeriksaan teknis audio, dan aturan transkrip Hi-Fi persis; kecocokan transkrip dengan hasil model tetap menunggu GPU.
+- [x] Menyediakan rubrik tujuh dimensi, kriteria kelulusan, serta template CSV untuk membandingkan hasil, waktu, retry, dan biaya.
+- [x] Memeriksa lima sampel MP3 pengguna tanpa menyalin audio: 44,1 kHz stereo, 41–113 detik, RMS −18,9 sampai −22,0 dBFS, dan puncak −0,5 sampai −3,0 dBFS.
 - [ ] Menguji efektivitas setiap preset gaya dan menghapus atau menandai preset yang belum konsisten.
 - [ ] Menyimpan referensi suara pilihan untuk menjaga identitas antar-generasi.
 - [ ] Menambahkan normalisasi teks Indonesia dan kamus pengucapan sederhana berdasarkan kesalahan nyata yang ditemukan.
@@ -512,10 +514,11 @@ Rujukan audit untuk diperiksa kembali saat integrasi:
 | 23 September 2026 | Fase 6B selesai tanpa saldo: API dan worker memproses naskah ekspresif berurutan, menyimpan status/hasil parsial, menormalisasi dan menggabungkan WAV, serta menyediakan retry satu segmen. | 59/59 tes Node, 9/9 tes worker, TypeScript, ESLint, dan build produksi lulus. Integrasi lokal memproses tiga ekspresi dan retry melalui Web UI/API; fake runtime membuktikan gabungan WAV 0,45 detik, regenerasi hanya pada segmen pilihan, dan pemakaian ulang referensi cloning. [Application checks 35856644094](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35856644094), [Worker container 35856643979](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35856643979), dan [GPU worker image 35856643949](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35856643949) lulus. Tidak ada inferensi GPU atau mutation RunPod. | Rekomendasi berikutnya tanpa saldo adalah Fase 6C: kontrak JSON `bebas-v1` berversi dan impor dari BEBAS. Uji dengar identitas, transisi, kekuatan ekspresi, waktu, dan biaya tetap menunggu satu siklus GPU berbayar terkontrol. |
 | 23 September 2026 | Integrasi inti Fase 6C selesai tanpa saldo: BEBAS mengekspor JSON `voxcpm-studio-script` v1 dan Studio mengimpor `script` setelah memvalidasi versi, dialek, ukuran, tag, panjang, serta jumlah segmen. | 63/63 tes Node, 108/108 tes Application BEBAS, 108/108 tes Infrastructure BEBAS, 31/31 tes UI BEBAS, build Next.js, build WinUI Release x64, serta [Application checks run 35862076950](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35862076950) lulus. Payload nyata dari serializer C# berhasil dibaca parser TypeScript dengan naskah dan caption Unicode tetap utuh. Tidak ada provider AI, GPU, atau mutation RunPod yang dipanggil. | Rekomendasi berikutnya tanpa saldo adalah persiapan Fase 6D: susun korpus 20–30 naskah uji, panduan rekaman referensi, dan pemeriksaan teknis WAV. Bantuan AI ekspresi opsional tetap ditunda karena generator utama berada di BEBAS. |
 | 23 September 2026 | Fase 6C.1 selesai tanpa saldo: dialek `bebas-v2` menambah empat delivery affiliate, mempertahankan impor v1, memperingatkan segmen panjang, dan memperbaiki aturan beat generator BEBAS. | 67/67 tes Node, 108/108 tes Application BEBAS, 109/109 tes Infrastructure BEBAS, 31/31 tes UI BEBAS, TypeScript, ESLint, build Next.js, build WinUI Release x64, serta [Application checks run 35866195738](https://github.com/Muhira007/VoxCPM-Studio/actions/runs/35866195738) lulus. Payload `bebas-v2` nyata dari serializer C# dengan tag baru berhasil dibaca parser TypeScript. Gateway palsu membuktikan prompt baru tanpa memanggil provider AI. | Rekomendasi berikutnya tanpa saldo tetap Fase 6D: korpus 20–30 naskah, panduan rekaman referensi, dan pemeriksaan kualitas WAV. Efektivitas tag serta identitas cloning menunggu uji dengar GPU. |
+| 24 September 2026 | Kesiapan lokal Fase 6D selesai tanpa saldo: pemeriksa tujuh aspek audio, panduan rekaman dan transkrip Hi-Fi, korpus 24 naskah, rubrik tujuh dimensi, serta template evaluasi CSV tersedia. Lima sampel pengguna dijadikan baseline tanpa menyalin audio ke repository. | 73/73 tes Node, TypeScript, ESLint, build Next.js, dan pemeriksaan UI desktop lulus. Seluruh kasus korpus valid tanpa peringatan kompiler; laporan gagal tidak dapat disimpan dan laporan dengan status yang dimanipulasi ditolak. | Siapkan satu WAV PCM mono 15–60 detik dari bagian terbaik sampel. Saat saldo tersedia, jalankan lima kasus smoke dalam satu siklus GPU untuk menilai identitas, ekspresi, transisi, waktu, dan biaya aktual. |
 
 ## 16. Langkah pengerjaan berikutnya
 
-**Rekomendasi aktif tanpa saldo:** mulai persiapan Fase 6D dengan membuat korpus 20–30 naskah uji Indonesia, panduan rekaman referensi suara, serta pemeriksaan lokal untuk format, durasi, level, clipping, dan keheningan WAV. Semua artefak tersebut dapat disiapkan sebelum inferensi GPU.
+**Rekomendasi aktif:** rekam atau ekspor satu referensi utama sebagai WAV PCM mono 15–60 detik, pastikan status lokal tidak gagal, lalu gunakan kasus smoke `ID-01`, `ID-04`, `ID-14`, `ID-18`, dan `ID-22` pada satu siklus GPU terkontrol ketika saldo tersedia. Kelima kasus membatasi biaya awal sambil mencakup identitas, affiliate, rupiah, kata Inggris, dan transisi ekspresi.
 
 Setelah saldo tersedia, lanjutkan Fase 5.3B: buat Network Volume 30 GB, jalankan aplikasi/watchdog satu replica pada persistent state, selesaikan blocker preflight, lalu gunakan satu siklus berbayar terbatas untuk uji dengar dan kalibrasi ekspresi. Kembalikan `RUNPOD_WRITE_ENABLED=false` setelah pengujian.
 

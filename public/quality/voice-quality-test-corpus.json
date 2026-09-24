@@ -1,0 +1,248 @@
+{
+  "schema": "voxcpm-studio-quality-corpus",
+  "version": 1,
+  "language": "id-ID",
+  "expressionDialect": "bebas-v2",
+  "cases": [
+    {
+      "id": "ID-01",
+      "title": "Narasi natural",
+      "category": "baseline",
+      "mode": "clone",
+      "focus": "Identitas suara dan kelancaran tanpa arahan ekspresi",
+      "expectedSeconds": 18,
+      "expectedTags": [],
+      "script": "Pagi ini udara terasa lebih sejuk dari biasanya. Saya menyiapkan secangkir teh, membuka jendela, lalu memulai pekerjaan dengan langkah kecil yang teratur."
+    },
+    {
+      "id": "ID-02",
+      "title": "Sapaan hangat",
+      "category": "affiliate",
+      "mode": "clone",
+      "focus": "Kehangatan dan kedekatan",
+      "expectedSeconds": 20,
+      "expectedTags": ["warm"],
+      "script": "[warm] Hai, teman-teman. Kalau kamu suka barang praktis yang benar-benar kepakai setiap hari, produk ini layak masuk daftar belanjamu."
+    },
+    {
+      "id": "ID-03",
+      "title": "Penjelasan tenang",
+      "category": "affiliate",
+      "mode": "clone",
+      "focus": "Tempo stabil dan artikulasi informatif",
+      "expectedSeconds": 23,
+      "expectedTags": ["calm"],
+      "script": "[calm] Cara menggunakannya sederhana. Buka penutup, ambil produk secukupnya, lalu simpan kembali di tempat yang kering agar kualitasnya tetap terjaga."
+    },
+    {
+      "id": "ID-04",
+      "title": "Produk bayi meyakinkan",
+      "category": "affiliate",
+      "mode": "clone",
+      "focus": "Peralihan penasaran, percaya, dan CTA",
+      "expectedSeconds": 34,
+      "expectedTags": ["curious", "reassuring", "persuasive"],
+      "script": "[curious] Kenapa banyak orang tua memilih tisu basah ini? [reassuring] Teksturnya lembut, tidak terasa lengket, dan nyaman digunakan untuk tangan, wajah, atau kebutuhan si kecil. [persuasive] Kalau kamu mencari pilihan praktis untuk dibawa bepergian, cek produknya di bawah video ini."
+    },
+    {
+      "id": "ID-05",
+      "title": "CTA persuasif",
+      "category": "affiliate",
+      "mode": "clone",
+      "focus": "Ajakan membeli tanpa berteriak",
+      "expectedSeconds": 25,
+      "expectedTags": ["warm", "persuasive"],
+      "script": "[warm] Produk ini cocok untuk kamu yang ingin rutinitas harian terasa lebih ringkas. [persuasive] Lihat detail variannya, pilih yang paling sesuai, lalu checkout sebelum promonya berubah."
+    },
+    {
+      "id": "ID-06",
+      "title": "Event gasp singkat",
+      "category": "event",
+      "mode": "clone",
+      "focus": "Gasp hanya pada satu kalimat",
+      "expectedSeconds": 22,
+      "expectedTags": ["gasp", "warm"],
+      "script": "[gasp] Serius, ukurannya sekecil ini? [warm] Meski ringkas, alat ini mudah dibawa dan tetap nyaman digunakan untuk kebutuhan sehari-hari."
+    },
+    {
+      "id": "ID-07",
+      "title": "Event tertawa singkat",
+      "category": "event",
+      "mode": "clone",
+      "focus": "Tawa native dan pemulihan delivery",
+      "expectedSeconds": 20,
+      "expectedTags": ["laughs", "warm"],
+      "script": "[laughs] Ternyata selama ini saya memasangnya terbalik. [warm] Setelah mengikuti petunjuknya, alat ini langsung bekerja dengan mudah dan hasilnya jauh lebih rapi."
+    },
+    {
+      "id": "ID-08",
+      "title": "Event helaan napas",
+      "category": "event",
+      "mode": "clone",
+      "focus": "Sigh native diikuti nada meyakinkan",
+      "expectedSeconds": 22,
+      "expectedTags": ["sighs", "reassuring"],
+      "script": "[sighs] Dulu saya sering kesulitan membersihkan noda ini. [reassuring] Sekarang prosesnya lebih cepat, tidak perlu digosok terlalu keras, dan permukaan tetap terasa aman."
+    },
+    {
+      "id": "ID-09",
+      "title": "Masalah dengan nada kesal",
+      "category": "emotion",
+      "mode": "clone",
+      "focus": "Kontras marah, tenang, dan persuasif",
+      "expectedSeconds": 29,
+      "expectedTags": ["angry", "calm", "persuasive"],
+      "script": "[angry] Kesal banget kalau kabel baru dipakai sebentar sudah mudah putus. [calm] Kabel ini memiliki lapisan yang lebih kokoh dan konektornya terasa rapat saat dipasang. [persuasive] Cek ukuran yang kamu butuhkan sebelum memilih variannya."
+    },
+    {
+      "id": "ID-10",
+      "title": "Urgensi tanpa panik berkepanjangan",
+      "category": "emotion",
+      "mode": "clone",
+      "focus": "Panik singkat lalu kembali stabil",
+      "expectedSeconds": 27,
+      "expectedTags": ["panicked", "calm", "persuasive"],
+      "script": "[panicked] Promonya tinggal beberapa jam lagi! [calm] Sebelum membeli, tetap periksa ukuran, warna, dan detail produk agar tidak salah pilih. [persuasive] Kalau semuanya sudah sesuai, selesaikan pesananmu sekarang."
+    },
+    {
+      "id": "ID-11",
+      "title": "Perbandingan sarkastik",
+      "category": "emotion",
+      "mode": "clone",
+      "focus": "Sarkas terkendali dan klaim terpercaya",
+      "expectedSeconds": 25,
+      "expectedTags": ["sarcastic", "reassuring"],
+      "script": "[sarcastic] Katanya praktis, tapi baru dipakai sekali sudah bikin repot. [reassuring] Pilihan ini terasa lebih kokoh, mudah dibersihkan, dan petunjuk penggunaannya jelas."
+    },
+    {
+      "id": "ID-12",
+      "title": "Rahasia promo berbisik",
+      "category": "emotion",
+      "mode": "clone",
+      "focus": "Bisikan, delivery hangat, dan CTA",
+      "expectedSeconds": 25,
+      "expectedTags": ["whispers", "warm", "persuasive"],
+      "script": "[whispers] Ada satu detail kecil yang sering dilewatkan orang. [warm] Varian ini sudah termasuk aksesori tambahan di dalam kemasan. [persuasive] Baca deskripsinya sampai selesai lalu pilih paket yang paling menguntungkan."
+    },
+    {
+      "id": "ID-13",
+      "title": "Alur affiliate lengkap",
+      "category": "affiliate",
+      "mode": "clone",
+      "focus": "Empat beat utama bebas-v2",
+      "expectedSeconds": 38,
+      "expectedTags": ["curious", "warm", "reassuring", "persuasive"],
+      "script": "[curious] Pernah merasa meja kerja cepat berantakan meski baru dirapikan? [warm] Organizer ini punya beberapa ruang untuk kabel, alat tulis, dan barang kecil yang sering tercecer. [reassuring] Bahannya terasa kokoh dan alasnya membantu menjaga posisi tetap stabil. [persuasive] Pilih warna favoritmu dan cek penawaran yang tersedia sekarang."
+    },
+    {
+      "id": "ID-14",
+      "title": "Harga rupiah",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "Angka dan mata uang",
+      "expectedSeconds": 23,
+      "expectedTags": ["calm"],
+      "script": "[calm] Harga normalnya Rp249.900, sedangkan harga promo hari ini Rp129.900. Selisihnya seratus dua puluh ribu rupiah sebelum biaya pengiriman."
+    },
+    {
+      "id": "ID-15",
+      "title": "Diskon dan persentase",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "Persentase dan nominal",
+      "expectedSeconds": 21,
+      "expectedTags": ["excited"],
+      "script": "[excited] Ada diskon 35 persen untuk pembelian kedua, ditambah voucher senilai Rp20.000 dengan minimum transaksi Rp150.000."
+    },
+    {
+      "id": "ID-16",
+      "title": "Tanggal dan waktu",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "Tanggal, tahun, jam, dan zona waktu",
+      "expectedSeconds": 19,
+      "expectedTags": ["calm"],
+      "script": "[calm] Penawaran berlaku mulai 24 September 2026 pukul 19.30 WIB sampai 1 Oktober 2026 pukul 23.59 WIB."
+    },
+    {
+      "id": "ID-17",
+      "title": "Singkatan teknis",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "BPOM, SNI, USB-C, LED, dan SPF",
+      "expectedSeconds": 24,
+      "expectedTags": ["calm"],
+      "script": "[calm] Produk ini mencantumkan nomor BPOM dan standar SNI. Kabelnya memakai konektor USB-C, indikator LED, serta perlindungan SPF 50 PA plus empat."
+    },
+    {
+      "id": "ID-18",
+      "title": "Campuran Indonesia–Inggris",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "Alih bahasa dan kata teknologi",
+      "expectedSeconds": 24,
+      "expectedTags": ["warm"],
+      "script": "[warm] Desain wireless ini cocok untuk daily use. Fitur fast charging membantu saat kamu sedang mobile, sementara smart indicator menampilkan status baterai secara langsung."
+    },
+    {
+      "id": "ID-19",
+      "title": "Nama produk dan merek",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "Nama asing dan seri produk",
+      "expectedSeconds": 22,
+      "expectedTags": ["calm"],
+      "script": "[calm] Xiaomi Redmi Note, Samsung Galaxy, dan Apple iPhone memiliki ukuran aksesori yang berbeda. Pastikan nama seri pada kemasan sama dengan perangkatmu."
+    },
+    {
+      "id": "ID-20",
+      "title": "Ukuran dan satuan",
+      "category": "pronunciation",
+      "mode": "clone",
+      "focus": "Desimal, berat, volume, dan listrik",
+      "expectedSeconds": 22,
+      "expectedTags": ["calm"],
+      "script": "[calm] Kapasitas wadah ini 500 mililiter, berat paketnya 1,5 kilogram, dan perangkat bekerja pada tegangan 220 volt dengan daya 45 watt."
+    },
+    {
+      "id": "ID-21",
+      "title": "Pertanyaan bertingkat",
+      "category": "prosody",
+      "mode": "clone",
+      "focus": "Intonasi tanya dan CTA",
+      "expectedSeconds": 23,
+      "expectedTags": ["curious", "persuasive"],
+      "script": "[curious] Apakah ukurannya pas, warnanya cocok, dan bahannya sesuai kebutuhanmu? [persuasive] Kalau tiga jawabannya iya, simpan produknya sekarang supaya mudah ditemukan lagi."
+    },
+    {
+      "id": "ID-22",
+      "title": "Transisi empat ekspresi",
+      "category": "prosody",
+      "mode": "clone",
+      "focus": "Kehalusan sambungan antarsegmen",
+      "expectedSeconds": 36,
+      "expectedTags": ["gasp", "calm", "reassuring", "persuasive"],
+      "script": "[gasp] Wah, kemasannya ternyata seringkas ini! [calm] Di dalamnya tersedia tiga kompartemen dengan fungsi yang berbeda. [reassuring] Pengunci terasa rapat dan setiap bagian mudah dibersihkan. [persuasive] Kalau fiturnya cocok untuk rutinitasmu, lihat detail produk sebelum checkout."
+    },
+    {
+      "id": "ID-23",
+      "title": "Konsistensi identitas",
+      "category": "identity",
+      "mode": "clone",
+      "focus": "Identitas suara pada delivery berulang",
+      "expectedSeconds": 29,
+      "expectedTags": ["warm", "calm", "warm"],
+      "script": "[warm] Halo, ini adalah suara saya saat menyapa dengan ramah. [calm] Sekarang saya menjelaskan informasi yang sama dengan tempo lebih stabil dan artikulasi lebih jelas. [warm] Di akhir, saya kembali ke nada hangat yang digunakan pada pembuka."
+    },
+    {
+      "id": "ID-24",
+      "title": "Transkrip Hi-Fi persis",
+      "category": "hifi",
+      "mode": "hifi",
+      "focus": "Kecocokan rekaman dan transkrip tanpa tag ekspresi",
+      "expectedSeconds": 24,
+      "expectedTags": [],
+      "script": "Hari ini saya merekam suara dengan jelas dan santai. Harga produk ini seratus dua puluh sembilan ribu rupiah. Promo berlaku sampai tanggal dua puluh lima Desember."
+    }
+  ]
+}

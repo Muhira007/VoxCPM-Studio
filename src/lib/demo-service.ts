@@ -13,6 +13,7 @@ import type {
   Voice,
 } from "./types.ts";
 import { compileExpressionScript } from "./expression-script.ts";
+import { isAudioQualityReport } from "./audio-analysis.ts";
 
 type Timer = ReturnType<typeof setTimeout>;
 export interface Runtime {
@@ -90,7 +91,8 @@ function validVoice(value: unknown): value is Voice {
     typeof value.duration === "number" &&
     Number.isFinite(value.duration) &&
     value.duration > 0 &&
-    typeof value.fileName === "string"
+    typeof value.fileName === "string" &&
+    (value.analysis === undefined || isAudioQualityReport(value.analysis))
   );
 }
 function validJob(value: unknown): value is SynthesisJob {

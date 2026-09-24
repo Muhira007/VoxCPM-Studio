@@ -15,6 +15,7 @@ import type {
   SynthesisRequest,
   Voice,
 } from "./types.ts";
+import type { AudioQualityReport } from "./audio-analysis.ts";
 
 export const API_STORAGE_KEY = "voxcpm-studio-api:v1";
 
@@ -44,6 +45,7 @@ interface ApiVoice {
   name: string;
   description: string;
   fileName: string;
+  analysis?: AudioQualityReport;
   createdAt: string;
 }
 
@@ -103,6 +105,8 @@ function mapVoice(voice: ApiVoice): Voice {
     source: "upload",
     color: "green",
     fileName: voice.fileName,
+    duration: voice.analysis?.durationSeconds,
+    analysis: voice.analysis,
     audioUrl: `/api/v1/voices/${encodeURIComponent(voice.id)}/audio`,
     createdAt: timestamp(voice.createdAt) || Date.now(),
   };
@@ -437,6 +441,9 @@ export class ApiStudioService implements StudioService {
     const form = new FormData();
     form.set("name", voice.name);
     form.set("description", voice.description);
+    if (!voice.analysis)
+      throw new Error("Laporan kualitas audio diperlukan untuk unggahan server.");
+    form.set("analysis", JSON.stringify(voice.analysis));
     form.set("file", file);
     const response = await this.request<{ voice: ApiVoice }>("/api/v1/voices", {
       method: "POST",
@@ -458,7 +465,13 @@ export class ApiStudioService implements StudioService {
     const updated = mapVoice(response.voice);
     this.publish({
       voices: this.snapshot.voices.map((voice) =>
-        voice.id === id ? { ...updated, duration: voice.duration } : voice,
+        voice.id === id
+          ? {
+              ...updated,
+              duration: voice.duration,
+              analysis: voice.analysis,
+            }
+          : voice,
       ),
     });
   }

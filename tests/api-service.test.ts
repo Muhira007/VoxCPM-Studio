@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApiStudioService } from "../src/lib/api-service.ts";
+import { analyzePcmAudio } from "../src/lib/audio-analysis.ts";
 
 const requestBody = {
   text: "Naskah dari adapter API.",
@@ -10,6 +11,13 @@ const requestBody = {
   transcript: "",
   style: "natural",
 };
+const apiAnalysis = analyzePcmAudio({
+  channelData: [new Float32Array(20 * 24_000).fill(0.3)],
+  sampleRate: 24_000,
+  format: "wav",
+  bitDepth: 16,
+  analyzedAt: 1,
+});
 
 function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -69,6 +77,7 @@ test("API adapter maps server state and sends authenticated browser requests wit
             name: "Referensi API",
             description: "Uji",
             fileName: "voice.wav",
+            analysis: apiAnalysis,
             createdAt: "2026-09-21T00:00:00.000Z",
           },
         ],
@@ -98,6 +107,8 @@ test("API adapter maps server state and sends authenticated browser requests wit
     service.getSnapshot().voices.at(-1)?.audioUrl,
     "/api/v1/voices/voice_adapter_001/audio",
   );
+  assert.equal(service.getSnapshot().voices.at(-1)?.duration, 20);
+  assert.equal(service.getSnapshot().voices.at(-1)?.analysis?.status, "pass");
 
   await service.startSession();
   assert.equal(service.getSnapshot().session.status, "ready");
@@ -111,6 +122,52 @@ test("API adapter maps server state and sends authenticated browser requests wit
   assert.match(headers.get("idempotency-key") || "", /^web_[a-f0-9]{32}$/);
   assert.equal(createCall?.init?.credentials, "same-origin");
   assert.equal(unauthorized, false);
+});
+
+test("API adapter uploads the checked quality report with a reference", async () => {
+  let submitted: FormData | undefined;
+  const service = new ApiStudioService(
+    () => undefined,
+    async (input, init) => {
+      assert.equal(String(input), "/api/v1/voices");
+      assert.equal(init?.method, "POST");
+      submitted = init?.body as FormData;
+      return json(
+        {
+          voice: {
+            id: "voice_uploaded_001",
+            name: "Referensi terperiksa",
+            description: "",
+            fileName: "voice.wav",
+            analysis: apiAnalysis,
+            createdAt: "2026-09-24T00:00:00.000Z",
+          },
+        },
+        201,
+      );
+    },
+  );
+  const file = new File(["RIFF test WAVE"], "voice.wav", {
+    type: "audio/wav",
+  });
+  const id = await service.addVoice(
+    {
+      id: "local_voice",
+      name: "Referensi terperiksa",
+      description: "",
+      source: "upload",
+      color: "green",
+      duration: 20,
+      fileName: file.name,
+      analysis: apiAnalysis,
+      createdAt: 1,
+    },
+    file,
+  );
+
+  assert.equal(id, "voice_uploaded_001");
+  assert.equal(submitted?.get("analysis"), JSON.stringify(apiAnalysis));
+  assert.equal((submitted?.get("file") as File | null)?.name, "voice.wav");
 });
 
 test("API adapter preserves the fetch receiver required by browsers", async () => {

@@ -1,3 +1,5 @@
+import type { AudioQualityReport } from "./audio-analysis";
+
 export type SynthesisMode = "tts" | "design" | "clone" | "hifi";
 export type StylePreset = "natural" | "calm" | "cheerful" | "dramatic";
 export type GpuStatus =
@@ -16,6 +18,7 @@ export interface Voice {
   duration?: number;
   fileName?: string;
   audioUrl?: string;
+  analysis?: AudioQualityReport;
   createdAt: number;
 }
 

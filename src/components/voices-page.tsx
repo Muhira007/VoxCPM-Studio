@@ -19,6 +19,11 @@ import { AudioPreview } from "./audio-preview";
 import { useStudio } from "./studio-provider";
 import { EmptyState, ErrorMessage, Modal, useToast, VoiceMark } from "./ui";
 import { VoiceDialog } from "./voice-dialog";
+import {
+  AudioQualityBadge,
+  AudioQualityPanel,
+  RecordingGuide,
+} from "./reference-quality";
 
 export function VoicesPage() {
   const { state, service } = useStudio();
@@ -100,6 +105,7 @@ export function VoicesPage() {
           Tambah suara
         </button>
       </div>
+      <RecordingGuide open />
       <div className="toolbar">
         <div
           className="filter-tabs"
@@ -177,6 +183,7 @@ export function VoicesPage() {
                     ? `${formatTime(voice.duration ?? 0)} · Rekaman asli`
                     : "Contoh karakter · tanpa rekaman"}
                 </div>
+                {voice.analysis && <AudioQualityBadge report={voice.analysis} />}
                 <div className="voice-card-actions">
                   <button
                     className="button small-button"
@@ -271,6 +278,14 @@ export function VoicesPage() {
                 <p className="small muted">
                   {detail.fileName} · {formatTime(detail.duration ?? 0)}
                 </p>
+                {detail.analysis ? (
+                  <AudioQualityPanel report={detail.analysis} />
+                ) : (
+                  <p className="info-note">
+                    Referensi lama ini belum memiliki laporan kualitas. Unggah ulang
+                    rekaman untuk menjalankan tujuh pemeriksaan teknis.
+                  </p>
+                )}
               </>
             ) : (
               <p className="info-note">

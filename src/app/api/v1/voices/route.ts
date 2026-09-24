@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { ServerVoice } from "@/server/contracts";
 import { ApiError, errorResponse, requireStudioAccess } from "@/server/http";
 import { appStore } from "@/server/store";
+import { isAudioQualityReport } from "@/lib/audio-analysis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ async function inspectSignature(file: File): Promise<string | null> {
 }
 
 function publicVoice(voice: ServerVoice) {
-  return { id: voice.id, name: voice.name, description: voice.description, fileName: voice.fileName, contentType: voice.contentType, size: voice.size, createdAt: voice.createdAt };
+  return { id: voice.id, name: voice.name, description: voice.description, fileName: voice.fileName, contentType: voice.contentType, size: voice.size, analysis: voice.analysis, createdAt: voice.createdAt };
 }
 
 export async function GET(request: Request) {
@@ -48,15 +49,29 @@ export async function POST(request: Request) {
     const file = form.get("file");
     const name = String(form.get("name") || "").trim();
     const description = String(form.get("description") || "").trim();
+    const analysisText = String(form.get("analysis") || "");
     if (!(file instanceof File)) throw new ApiError(422, "file is required.");
     if (!name || name.length > 60) throw new ApiError(422, "name must contain 1–60 characters.");
     if (description.length > 300) throw new ApiError(422, "description cannot exceed 300 characters.");
+    if (!analysisText || analysisText.length > 16_384)
+      throw new ApiError(422, "A bounded audio quality report is required.");
+    let analysis: unknown;
+    try {
+      analysis = JSON.parse(analysisText);
+    } catch {
+      throw new ApiError(422, "The audio quality report is not valid JSON.");
+    }
+    if (!isAudioQualityReport(analysis) || analysis.status === "fail")
+      throw new ApiError(422, "The audio quality report is invalid or failed.");
     if (!allowedExtensions.test(file.name)) throw new ApiError(422, "Use WAV, MP3, FLAC, M4A, OGG, or WebM.");
     if (!file.size || file.size > maximumBytes) throw new ApiError(422, "Audio must be larger than 0 and no more than 20 MB.");
     const contentType = await inspectSignature(file);
     if (!contentType) throw new ApiError(422, "The file signature does not match a supported audio format.");
+    const extension = file.name.split(".").at(-1)?.toUpperCase();
+    if (analysis.format !== extension || analysis.durationSeconds > 300)
+      throw new ApiError(422, "The audio quality report does not match the uploaded file.");
     const storageName = await appStore.saveReference(file);
-    const voice: ServerVoice = { id: `voice_${randomUUID().replaceAll("-", "")}`, name, description, fileName: file.name.slice(0, 255), storageName, contentType, size: file.size, createdAt: new Date().toISOString() };
+    const voice: ServerVoice = { id: `voice_${randomUUID().replaceAll("-", "")}`, name, description, fileName: file.name.slice(0, 255), storageName, contentType, size: file.size, analysis, createdAt: new Date().toISOString() };
     try {
       await appStore.addVoice(voice);
     } catch (error) {

@@ -1,0 +1,2 @@
+run_id,case_id,created_at,voice_reference,mode,gpu,parameters,audio_seconds,inference_seconds,retries,identity_1_5,pronunciation_1_5,naturalness_1_5,expression_1_5,transitions_1_5,artifacts_1_5,pace_1_5,average,usable,notes
+example-001,ID-01,2026-09-24T00:00:00+07:00,reference.wav,clone,RTX 3090,"seed=;cfg=",0,0,0,0,0,0,0,0,0,0,0,no,"Ganti baris contoh saat pengujian GPU dimulai"

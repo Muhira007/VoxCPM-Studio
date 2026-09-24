@@ -2,11 +2,13 @@
 
 import { Check, Upload, UploadCloud } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { inspectAudio, saveAudio } from "@/lib/audio-storage";
+import { inspectReferenceAudio, type AudioQualityReport } from "@/lib/audio-analysis";
+import { saveAudio } from "@/lib/audio-storage";
 import { formatTime } from "@/lib/fixtures";
 import type { Voice } from "@/lib/types";
 import { useStudio } from "./studio-provider";
 import { ErrorMessage, Modal, useToast } from "./ui";
+import { AudioQualityPanel, RecordingGuide } from "./reference-quality";
 
 export function VoiceDialog({
   open,
@@ -25,6 +27,9 @@ export function VoiceDialog({
   const [description, setDescription] = useState(voice?.description ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [duration, setDuration] = useState(0);
+  const [analysis, setAnalysis] = useState<AudioQualityReport | undefined>(
+    voice?.analysis,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function selectFile(selected: File | undefined) {
@@ -32,10 +37,12 @@ export function VoiceDialog({
     setError("");
     setBusy(true);
     setFile(null);
+    setAnalysis(undefined);
     try {
-      const seconds = await inspectAudio(selected);
+      const report = await inspectReferenceAudio(selected);
       setFile(selected);
-      setDuration(seconds);
+      setDuration(report.durationSeconds);
+      setAnalysis(report);
       if (!name) setName(selected.name.replace(/\.[^.]+$/, "").slice(0, 60));
     } catch (problem) {
       setError(
@@ -56,6 +63,10 @@ export function VoiceDialog({
       setError("Pilih rekaman referensi terlebih dahulu.");
       return;
     }
+    if (!voice && analysis?.status === "fail") {
+      setError("Rekaman masih memiliki masalah bertanda gagal. Pilih atau rekam ulang audio.");
+      return;
+    }
     setError("");
     setBusy(true);
     try {
@@ -72,6 +83,7 @@ export function VoiceDialog({
           color: "green",
           duration,
           fileName: file.name,
+          analysis,
           createdAt: Date.now(),
         }, file);
         onCreated?.(createdId);
@@ -130,6 +142,7 @@ export function VoiceDialog({
             </span>
           </label>
         )}
+        {analysis && <AudioQualityPanel report={analysis} compact />}
         <label className="field-label">
           Nama suara
           <input
@@ -151,12 +164,7 @@ export function VoiceDialog({
             placeholder="Karakter suara, gaya, atau catatan rekaman…"
           />
         </label>
-        {!voice && (
-          <p className="small muted">
-            Rekaman bersih sepanjang 5–30 detik adalah titik awal yang baik.
-            Demo menerima audio hingga 5 menit untuk pratinjau.
-          </p>
-        )}
+        {!voice && <RecordingGuide />}
         {error && <ErrorMessage>{error}</ErrorMessage>}
         <div className="dialog-actions">
           <button
@@ -167,7 +175,11 @@ export function VoiceDialog({
           >
             Batal
           </button>
-          <button type="submit" className="button primary" disabled={busy}>
+          <button
+            type="submit"
+            className="button primary"
+            disabled={busy || (!voice && analysis?.status === "fail")}
+          >
             <Upload size={16} />
             {busy ? "Memproses…" : "Simpan referensi"}
           </button>

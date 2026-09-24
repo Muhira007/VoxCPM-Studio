@@ -1,4 +1,5 @@
 import type { JobStatus, SynthesisRequest, SynthesisSegment } from "@/lib/types";
+import type { AudioQualityReport } from "@/lib/audio-analysis";
 
 export type ApiSessionStatus = "off" | "loading" | "ready" | "stopping" | "error";
 
@@ -35,6 +36,7 @@ export interface ServerVoice {
   storageName: string;
   contentType: string;
   size: number;
+  analysis?: AudioQualityReport;
   createdAt: string;
 }
 

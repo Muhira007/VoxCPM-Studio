@@ -252,6 +252,195 @@ textarea::placeholder {
   gap: 10px;
   margin-top: 8px;
 }
+.recording-guide {
+  border: 1px solid #dfe6ec;
+  border-radius: 11px;
+  background: #fbfcfd;
+}
+.recording-guide > summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 15px 17px;
+  cursor: pointer;
+  color: #526170;
+}
+.recording-guide > summary::marker {
+  color: #bd6039;
+}
+.recording-guide > summary > span,
+.recording-guide > summary strong,
+.recording-guide > summary small {
+  display: block;
+}
+.recording-guide > summary strong {
+  color: #39434d;
+  font-size: 13px;
+}
+.recording-guide > summary small {
+  margin-top: 3px;
+  color: #77828e;
+  font-size: 11px;
+}
+.recording-guide-body {
+  padding: 0 17px 17px;
+  border-top: 1px solid #e7ecf0;
+}
+.recording-guide-body ol {
+  margin: 15px 0 0 19px;
+  color: #606b76;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.recording-script {
+  margin-top: 14px;
+  padding: 13px 14px;
+  border: 1px solid #eadfd7;
+  border-radius: 8px;
+  background: #fffaf7;
+}
+.recording-script > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #8f583d;
+  font-size: 12px;
+}
+.recording-script p {
+  margin-top: 8px;
+  color: #625c58;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.guide-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 18px;
+  margin-top: 14px;
+}
+.guide-downloads a {
+  color: #a85231;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.quality-panel {
+  overflow: hidden;
+  border: 1px solid #d9e5dc;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+.quality-panel.warning {
+  border-color: #ead9b9;
+  background: #fffdf8;
+}
+.quality-panel.fail {
+  border-color: #e9c8c3;
+  background: #fffafa;
+}
+.quality-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 15px;
+  border-bottom: 1px solid rgba(120, 135, 145, 0.16);
+}
+.quality-heading > div,
+.quality-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.quality-heading strong {
+  font-size: 13px;
+}
+.quality-heading span {
+  color: #6e7984;
+  font-size: 11px;
+  text-align: right;
+}
+.quality-panel.pass .quality-heading > div,
+.quality-badge.pass {
+  color: #4c7a5b;
+}
+.quality-panel.warning .quality-heading > div,
+.quality-badge.warning {
+  color: #946820;
+}
+.quality-panel.fail .quality-heading > div,
+.quality-badge.fail {
+  color: #a0443c;
+}
+.quality-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 13px 15px;
+  gap: 11px;
+}
+.quality-metrics dt,
+.quality-metrics dd {
+  margin: 0;
+}
+.quality-metrics dt {
+  color: #7c8791;
+  font-size: 10px;
+}
+.quality-metrics dd {
+  margin-top: 3px;
+  color: #424b54;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.quality-findings {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0 15px 15px;
+  list-style: none;
+}
+.quality-findings li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #65717c;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.quality-findings li svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.quality-findings li strong {
+  display: block;
+  color: #49535d;
+}
+.quality-findings li.warning svg {
+  color: #a47527;
+}
+.quality-findings li.fail svg {
+  color: #ad4c42;
+}
+.quality-findings li.pass svg {
+  color: #548265;
+}
+.quality-all-pass {
+  padding: 0 15px 15px;
+  color: #557462;
+  font-size: 11px;
+}
+.quality-badge {
+  width: fit-content;
+  margin-top: 13px;
+  padding: 5px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
 .extra-input {
   padding: 0 24px 20px;
 }
@@ -1325,6 +1514,16 @@ textarea::placeholder {
   }
   .voice-card-body > p {
     min-height: 0;
+  }
+  .quality-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .quality-heading span {
+    text-align: left;
+  }
+  .quality-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stat-row {
     gap: 8px;

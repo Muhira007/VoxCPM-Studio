@@ -39,6 +39,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         fileName: voice.fileName,
         contentType: voice.contentType,
         size: voice.size,
+        analysis: voice.analysis,
         createdAt: voice.createdAt,
       },
     });
